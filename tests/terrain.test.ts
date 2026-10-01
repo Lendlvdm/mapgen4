@@ -28,9 +28,24 @@ test('exports preserve 16-bit heights, float heights and declared axis metadata'
  const decoded=unzlibSync(idat!);assert.equal(decoded.length,(257*2+1)*257);assert.equal(decoded[0],0);assert.equal(decoded[1]*256+decoded[2],raw.getUint16(0,true));
 });
 test('large scale uses physical metres and includes exact boundary samples',()=>{const big=generateTerrain({worldSize:1024,resolution:129,vegetation:0});assert.equal(big.settings.worldSize/(big.settings.resolution-1),8);assert.equal(big.landmarks[0].z,304);const c=chunkMesh(big,1,1);assert.equal(c.origin[0]+c.positions[c.positions.length-3],512);assert.ok(big.stats.maxHeight>t.stats.maxHeight*2);});
-test('invalid or excessive requests fail before allocation',()=>{for(const p of [{seed:NaN},{resolution:8193},{worldSize:100000},{terrace:2},{relief:-1},{seed:1.4}])assert.throws(()=>settings(p));assert.throws(()=>chunkMesh(t,50,0));});
+test('invalid or excessive requests fail before allocation',()=>{for(const p of [{seed:NaN},{resolution:8193},{worldSize:100000},{terrace:2},{relief:-1},{seed:1.4},{walkability:-.01},{walkability:1.01},{walkability:NaN}])assert.throws(()=>settings(p));assert.throws(()=>chunkMesh(t,50,0));});
+test('walkable terrain grading increases real gentle ground and preserves regional constraints',()=>{
+ const medium=generateTerrain({...t.settings,walkability:.5}),broad=generateTerrain({...t.settings,walkability:1}),n=t.settings.resolution;
+ assert.ok(medium.stats.walkablePercent>t.stats.walkablePercent+3);
+ assert.ok(broad.stats.walkablePercent>medium.stats.walkablePercent+8);
+ assert.notDeepEqual(broad.heights,t.heights);
+ assert.deepEqual(broad.biomeWeights,t.biomeWeights);
+ assert.deepEqual(broad.routes,t.routes);assert.deepEqual(broad.landmarks,t.landmarks);
+ for(let i=0;i<n;i++) for(const k of [i,(n-1)*n+i,i*n,i*n+n-1]) assert.equal(broad.heights[k],t.heights[k]);
+ for(const l of broad.landmarks)assert.ok(Math.abs(heightAt(broad,l.x,l.z)-l.y)<.002);
+ for(let k=0;k<broad.heights.length;k++)if(broad.walkable[k])assert.ok(broad.slopes[k]<=30);
+ const files=exportFiles(broad,false),recipe=JSON.parse(new TextDecoder().decode(files['recipe.json']));
+ assert.equal(recipe.walkability,1);delete recipe.schemaVersion;
+ assert.deepEqual(generateTerrain(recipe).heights,broad.heights);
+ assert.equal(settings({seed:187}).walkability,0);
+});
 test('route connectivity survives representative seeds and extreme shaping controls',()=>{
- for(const options of [{seed:0,relief:.5,terrace:0,detail:1},{seed:991,relief:1.5,terrace:1,detail:1},{seed:2147483647,relief:1,terrace:.82,detail:.65},{seed:187,worldSize:1024,resolution:1025}]){
+ for(const options of [{seed:0,relief:.5,terrace:0,detail:1},{seed:991,relief:1.5,terrace:1,detail:1},{seed:2147483647,relief:1,terrace:.82,detail:.65},{seed:187,worldSize:1024,resolution:1025},{seed:0,walkability:.5},{seed:991,relief:1.5,terrace:1,walkability:1},{seed:187,worldSize:1024,resolution:1025,walkability:1}]){
   const world=generateTerrain({resolution:257,vegetation:0,...options}),n=world.settings.resolution,size=world.settings.worldSize;
   const cell=(x:number,z:number)=>Math.round((z/size+.5)*(n-1))*n+Math.round((x/size+.5)*(n-1));
   const first=world.landmarks[0],queue=[cell(first.x,first.z)],seen=new Uint8Array(n*n);seen[queue[0]]=1;

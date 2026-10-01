@@ -9,6 +9,8 @@
 <div class="row"><div><label for="seed">World seed</label><input id="seed" type="number" min="0" max="2147483647" step="1" value="187"></div><div><label for="resolution">Height samples</label><select id="resolution"><option value="129">129 × 129</option><option value="257">257 × 257</option><option value="513" selected>513 × 513</option><option value="1025">1025 × 1025</option></select></div></div>
 <p id="spacing" class="hint">0.50 m between height samples</p>
 <h2>Landscape character</h2>
+<label for="walkability">Walkable terrain <output id="walkability-value">0%</output></label><input id="walkability" type="range" min="0" max="1" step="0.01" value="0" aria-describedby="walkability-hint">
+<p id="walkability-hint" class="hint">Increase to soften inland slopes and expand gentle ground. This is shaping strength; the resulting walkable area appears below the preview.</p>
 <label for="relief">Cliff relief <output id="relief-value">1.00</output></label><input id="relief" type="range" min="0.5" max="1.5" step="0.05" value="1">
 <label for="terrace">Terraced shelves <output id="terrace-value">0.82</output></label><input id="terrace" type="range" min="0" max="1" step="0.01" value="0.82">
 <label for="detail">Surface detail <output id="detail-value">0.65</output></label><input id="detail" type="range" min="0" max="1" step="0.01" value="0.65">

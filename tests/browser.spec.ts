@@ -1,4 +1,23 @@
 import {test,expect} from '@playwright/test';
+import {readFile} from 'node:fs/promises';
+test('walkable terrain control expands ground and survives recipe saving and loading',async({page})=>{
+ test.setTimeout(180000);const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('http://127.0.0.1:5174');await expect(page.locator('body')).toHaveAttribute('data-ready','true',{timeout:90000});
+ const baseline=await page.evaluate(()=>(window as any).__moonwake.stats.walkablePercent);
+ await page.locator('#walkability').focus();await page.locator('#walkability').press('End');
+ await expect(page.locator('#walkability-value')).toHaveText('100%');await page.locator('#generate').click();
+ await page.waitForFunction(()=>(window as any).__moonwake.settings.walkability===1);
+ const improved=await page.evaluate(()=>(window as any).__moonwake.stats.walkablePercent);
+ expect(improved).toBeGreaterThan(baseline+15);await expect(page.locator('#export')).toBeEnabled();
+ const pending=page.waitForEvent('download');await page.locator('#save-recipe').click();const download=await pending;
+ const recipe=JSON.parse(await readFile((await download.path())!,'utf8'));expect(recipe.walkability).toBe(1);
+ await page.screenshot({path:'test-results/studio-walkable.png',fullPage:true});
+ await page.locator('#walkability').press('Home');await expect(page.locator('#walkability-value')).toHaveText('0%');
+ await page.locator('#recipe-file').setInputFiles({name:'walkable.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(recipe))});
+ await expect(page.locator('#walkability-value')).toHaveText('100%');await expect(page.locator('#export')).toBeEnabled({timeout:60000});
+ expect(await page.evaluate(()=>(window as any).__moonwake.stats.walkablePercent)).toBe(improved);
+ expect(errors).toEqual([]);
+});
 test('studio generates, changes views, saves recipe and exports real data',async({page})=>{
  test.setTimeout(180000);const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto('http://127.0.0.1:5174');await expect(page.locator('body')).toHaveAttribute('data-ready','true',{timeout:90000});

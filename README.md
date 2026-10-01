@@ -33,11 +33,20 @@ Open **http://127.0.0.1:5174**. Choose a seed, world size and sample count, then
 
 World dimensions and resolution are independent. A 1 km map at 129 samples is a coarse preview, not metre-resolution terrain. The studio displays spacing explicitly. Changes to controls require Generate; exports and Save recipe use the last generated world.
 
+### Increase walkable terrain
+
+Raise **Walkable terrain** under Landscape character, then click **Generate landscape**. Higher strength blends inland terraces and ravines toward gentle ground while keeping the perimeter cliffs, biome boundaries, route grades and landmark clearings. Use **Walkability** to inspect the result and **Slope-pass area** to read the measured area. The slider is shaping strength, not a promised percentage or a change to the 30° slope limit.
+
+For seed 187 with the other default controls, maximum strength raises slope-pass area from **36.1% to 58.2%** in the 256 m / 513-sample valley, and **37.8% to 60.5%** in the 1,024 m / 1025-sample world. Results depend on the seed, relief, detail and sample spacing. These are terrain slope candidates; final gameplay navigation still needs prop collisions and player testing.
+
+The setting is saved in recipes and exports. Older recipes default to 0%, retaining their original terrain.
+
 ## Command-line generation
 
 ```sh
 npm run generate -- --size 1024 --resolution 1025 --seed 187 --out exports/nacre-1024
 npm run generate -- --recipe exports/nacre-1024/recipe.json --out exports/reproduced
+npm run generate -- --size 1024 --resolution 1025 --walkability 1 --out exports/nacre-walkable
 ```
 
 Generated bundles are ignored by Git because high-resolution worlds can be large. See [the export contract](moonwake/docs/EXPORTS.md), [architecture](moonwake/docs/ARCHITECTURE.md) and [production scope](moonwake/docs/PRODUCTION.md).

@@ -59,6 +59,12 @@ export function generateTerrain(input:Partial<Settings>={}):Terrain {
     // Cut branching ravines between traversable shelves, then repair authored routes below.
     const channel=Math.abs(noise(nx*3.1+3,nz*3.1-4)+.22*noise(nx*8,nz*8));
     h-=((1-smooth(.022,.11,channel))*10+Math.min(2,flow*.35))*p.terrace;
+    // Expand gentle inland ground without changing the walkability slope limit.
+    // Zero preserves old recipes exactly; the perimeter retains its original cliffs.
+    const gentle=8+(76-z)*.145+5*smooth(0,85,x)
+      -4*Math.exp(-((x+84)**2+(z-8)**2)/2400);
+    const grading=p.walkability*(1-rim);
+    h=h*(1-grading)+gentle*grading;
     const road=routeAt(routes,x*s,z*s),roadWeight=1-smooth(road.width*.55,road.width*.55+5*s,road.distance);
     h=h*s*(1-roadWeight)+road.height*roadWeight;
     routeMask[k]=road.distance<road.width*.5?255:0;

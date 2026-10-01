@@ -2,6 +2,8 @@
 
 An export directory or ZIP is self-contained. Read its `manifest.json`; never infer dimensions or height scale from filenames. The browser exports its last successfully generated world. Save recipe also saves that world, not unsaved control changes.
 
+Recipes and manifest settings include `walkability`, a shaping strength from 0 to 1. Missing values default to 0, preserving recipes created before the control was added. This changes exported terrain heights and their derived masks, normals and placements; the candidate walkable mask still uses the same ≤30° slope test. The browser shows strength as 0–100%. CLI generation accepts `--walkability 0.8`; when `--recipe` is supplied, settings come from that recipe.
+
 ## Coordinate conventions
 
 - One unit is one metre. Y is up, X east, −Z north.

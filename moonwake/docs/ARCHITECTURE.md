@@ -11,7 +11,7 @@ The macro field contributes terrain variation, moisture and channel depth. The f
 1. Validate seed, finite numeric parameters, world size and resolution before allocating arrays.
 2. Run the upstream macro generator with deterministic random numbers.
 3. Shape a south/central landing basin, west garden depression, east geological rise and northern highlands.
-4. Apply terrace bands, seeded detail and branching ravines. Blend physical route grades into terrain and flatten landmark reservations.
+4. Apply terrace bands, seeded detail and branching ravines. Optional `walkability` grading blends inland heights toward a broad south-to-north rise with a shallow western depression and eastern rise. Its influence fades across the perimeter rim to preserve the outer cliff samples. Blend physical route grades into terrain and flatten landmark reservations afterward.
 5. Derive four continuous biome weights. Quantize using largest remainders so all four channels sum to exactly 255.
 6. Calculate global normals, incident-edge slopes and candidate walk/build masks. Full-resolution global samples are the source for every chunk edge.
 7. Place deterministic spaced scenery proxies, excluding routes, steep ground and landmark clearings.
@@ -30,6 +30,8 @@ The macro field contributes terrain variation, moisture and channel depth. The f
 | `cli.ts` | Reproducible offline generation to a directory |
 
 The Node CLI and browser worker use the same terrain/export modules. There is no server-side generation service, account or backend requirement. The development server binds to loopback only and only serves the demo, build output and reference art.
+
+`walkability` is a deterministic 0–1 shaping strength, defaulting to zero for existing recipes. It changes actual vertex heights before normals, masks, colors and placements are derived. It never increases the 30° walkable slope threshold. Biome weights, authored route coordinates and landmark reservations are independent of this control. Increasing strength generally expands gentle ground, but individual cells can lose slope eligibility at blending shoulders; it does not guarantee a target fraction or full player reachability.
 
 ## Scale and memory
 

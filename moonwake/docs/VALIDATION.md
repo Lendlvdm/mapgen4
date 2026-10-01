@@ -6,8 +6,8 @@
 |---|---|
 | Cross-platform build: studio, worker, CLI, tests and original demo | Passed |
 | TypeScript check (`npm run typecheck`) | Passed |
-| Terrain and export tests | 12 passed, 0 failed |
-| Browser tests on installed Chrome | 2 passed, 0 failed |
+| Terrain and export tests | 13 passed, 0 failed |
+| Browser tests on installed Chrome | 3 passed, 0 failed |
 | 1 km / 1025-sample CLI generation | Passed |
 | Godot 4.7.2 glTF loading | 768 / 768 files passed |
 | Static terrain collision shape creation | 256 / 256 full-detail tiles passed |
@@ -29,6 +29,8 @@ A four-neighbor flood fill connects all four clearings for the default campaign 
 
 ## Measured 1 km export
 
+The full Godot loading and collision checks below used the original terrain (`walkability: 0`). They were not repeated for the new shaping control; the export format is unchanged.
+
 - Seed: 187. Resolution: 1025 × 1025. Sample spacing: 1 m.
 - Full-resolution terrain: 2,097,152 triangles in 256 tiles.
 - Three uniform detail levels: 768 GLBs total.
@@ -37,6 +39,19 @@ A four-neighbor flood fill connects all four clearings for the default campaign 
 - Generation: approximately 1.8 seconds in the Node CLI on this host. Browser worker timing in the captured run: approximately 3.5 seconds. These measurements exclude ZIP encoding and do not establish runtime frame rate.
 - Export directory: approximately 95.9 MB before ZIP compression, including all LODs and data masks.
 - Complete machine-readable Godot result: [godot-validation.json](godot-validation.json).
+
+## Walkable terrain control
+
+The updated build, type check, 13 terrain/export tests and 3 browser tests passed. Browser coverage includes keyboard operation of the new slider, a measured increase in slope-pass area, downloading its recipe and restoring the control and result from that recipe. No page errors were recorded.
+
+| Seed 187, other default controls | Strength 0% | Strength 50% | Strength 80% | Strength 100% |
+|---|---:|---:|---:|---:|
+| 256 m / 513 samples | 36.09% | 42.33% | 46.78% | 58.23% |
+| 1,024 m / 1025 samples | 37.75% | 45.25% | 49.77% | 60.53% |
+
+Numbers are measured terrain slope-pass area, not the slider value or collision-aware navigation coverage. Tests also verify unchanged biome blends and perimeter heights, retained landmark elevations, the unchanged 30-degree limit, and exact height reproduction from an exported recipe. Route flood-fill checks include intermediate grading at seed 0, maximum grading at seed 991 with high relief/terraces, and maximum grading on the metre-spaced 1 km reference world.
+
+![Maximum walkable terrain strength in the campaign valley](images/studio-walkable.png)
 
 ## Important distinctions
 

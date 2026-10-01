@@ -1,14 +1,34 @@
 {
-    "name": "@redblobgames/mapgen4",
-    "version": "2.0.0",
-    "private": true,
-    "type": "module",
-    "dependencies": {
-        "@redblobgames/prng": "https://github.com/redblobgames/prng",
-        "delaunator": "^5",
-        "fast-2d-poisson-disk-sampling": "^1",
-        "flatqueue": "^2",
-        "gl-matrix": "^3",
-        "simplex-noise": "^4"
-    }
+  "name": "moonwake-mapgen",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@redblobgames/prng": "file:vendor/prng-source",
+    "delaunator": "^5",
+    "fast-2d-poisson-disk-sampling": "^1",
+    "fflate": "^0.8.3",
+    "flatqueue": "^2",
+    "gl-matrix": "^3",
+    "simplex-noise": "^4",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.3",
+    "@types/three": "^0.186.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "node scripts/serve.mjs",
+    "test": "npm run build && node --test build/terrain.test.mjs",
+    "test:browser": "playwright test",
+    "generate": "node build/moonwake-cli.mjs",
+    "typecheck": "tsc -p tsconfig.moonwake.json"
+  },
+  "engines": {
+    "node": ">=22"
+  }
 }

@@ -1,0 +1,2 @@
+import {defineConfig} from '@playwright/test';
+export default defineConfig({testDir:'./tests',testMatch:'browser.spec.ts',workers:1,use:{viewport:{width:1600,height:1000},launchOptions:{executablePath:process.env.CHROME_PATH||'C:/Program Files/Google/Chrome/Application/chrome.exe',args:['--enable-unsafe-swiftshader']}},webServer:{command:'node scripts/serve.mjs',url:'http://127.0.0.1:5174',reuseExistingServer:true,timeout:15000}});

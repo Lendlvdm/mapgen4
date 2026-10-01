@@ -1,0 +1,23 @@
+import {test,expect} from '@playwright/test';
+test('studio generates, changes views, saves recipe and exports real data',async({page})=>{
+ test.setTimeout(180000);const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('http://127.0.0.1:5174');await expect(page.locator('body')).toHaveAttribute('data-ready','true',{timeout:90000});
+ await expect(page.locator('#extent')).toContainText('256');await expect(page.locator('#export')).toBeEnabled();
+ await page.screenshot({path:'test-results/studio-campaign.png',fullPage:true});
+ await page.getByRole('button',{name:'Biomes',exact:true}).click();await expect(page.locator('#biomes')).toHaveClass('active');
+ await page.getByRole('button',{name:'Walkability',exact:true}).click();await expect(page.locator('#status')).toContainText('slope-pass');
+ await page.getByRole('button',{name:'Landscape',exact:true}).click();await page.getByRole('button',{name:'Hide dressing',exact:true}).click();await expect(page.locator('#scenery')).toHaveText('Show dressing');await page.locator('#scenery').click();
+ const recipePromise=page.waitForEvent('download');await page.locator('#save-recipe').click();const recipe=await recipePromise;expect(recipe.suggestedFilename()).toContain('recipe-187');
+ await page.locator('#resolution').selectOption('129');await page.locator('#generate').click();await expect(page.locator('#sample')).toHaveText('2.00 m',{timeout:60000});await expect(page.locator('#export')).toBeEnabled();
+ await page.locator('#lods').uncheck();const archivePromise=page.waitForEvent('download');await page.locator('#export').click();const archive=await archivePromise;expect(archive.suggestedFilename()).toContain('256m-seed-187.zip');await archive.saveAs('test-results/browser-export.zip');await expect(page.locator('#status')).toContainText('exported');expect(errors).toEqual([]);
+ await page.screenshot({path:'test-results/studio.png',fullPage:true});
+});
+test('one kilometre terrain renders at metre spacing and recipe reload regenerates it',async({page})=>{
+ test.setTimeout(180000);const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('http://127.0.0.1:5174');await expect(page.locator('body')).toHaveAttribute('data-ready','true',{timeout:90000});
+ const recipe={schemaVersion:1,seed:187,worldSize:1024,resolution:1025,relief:1,terrace:.82,detail:.65,moisture:.7,vegetation:.7};
+ await page.locator('#recipe-file').setInputFiles({name:'recipe.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(recipe))});
+ await expect(page.locator('#extent')).toContainText('1,024',{timeout:90000});await expect(page.locator('#sample')).toHaveText('1.00 m');await expect(page.locator('#triangles')).toHaveText('2.10 M');await expect(page.locator('#export')).toBeEnabled();
+ await page.screenshot({path:'test-results/studio-open-world.png',fullPage:true});
+ await page.locator('#top').click();await page.locator('#biomes').click();await page.screenshot({path:'test-results/studio-biomes.png',fullPage:true});expect(errors).toEqual([]);
+});

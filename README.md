@@ -49,11 +49,14 @@ Enable **Terrain painter → Enable painting**. Choose a feature, radius in metr
 | Feature | Left hold | Right hold |
 |---|---|---|
 | Cliffs / hills | Raise local terrain with a soft shoulder | Lower local terrain |
+| Blend / smooth slopes | Gradually average neighboring heights within the brush | Blend back toward the original generated relief |
 | Path | Add a path reservation and level toward the stroke's starting height | Remove painted reservation and blend toward generated terrain |
 | Build area | Add a building reservation and level toward the stroke's starting height | Remove painted reservation and blend toward generated terrain |
 | Biome | Increase the selected biome's blend weight | Redistribute that weight to other biomes |
 | Biome dressing | Increase local scenery density | Thin local scenery |
 | Moisture | Increase local wetness data | Decrease local wetness data |
+
+Blend softens ridges and fills small depressions with a feathered edge. Brush radius controls the affected area and averaging scale; strength and hold duration control smoothing. Protected routes and clearings retain their heights. Use Undo stroke to recover the exact pre-stroke shape; right-click returns toward generated terrain.
 
 Changes appear during the stroke. Dressing refreshes at a throttled rate; final slopes, statistics and placements settle when released. **Undo stroke** removes the last complete drag; **Clear painting** restores the generated world. Painting automatically selects a useful inspection view for each data layer. A build reservation only becomes a build candidate when it meets the slope and exclusion rules.
 

@@ -1,5 +1,9 @@
 # Validation / 2 October 2026
 
+## Blend brush
+
+Build and type checks, all 21 terrain/export tests, and the targeted browser painter flow passed. New checks cover peak smoothing, symmetric averaging, unchanged samples outside the brush, protected approach heights, map corners, right-button relief restoration, and exact recipe/export replay. Browser checks use actual left/right holds with Blend selected and verify the edited recipe and height data in the downloaded ZIP.
+
 ## Generator 2 and terrain painter
 
 - Build and TypeScript checks passed.

@@ -88,6 +88,7 @@ test('painting changes real heights and data locally, supports subtraction and e
  applyBrush(world,{...base,feature:'dressing',amount:-1});assert.equal(world.dressing[k],0);applyBrush(world,{...base,feature:'dressing',amount:.5});assert.equal(world.dressing[k],.5);
  applyBrush(world,{...base,feature:'path'});assert.ok(world.pathPaint[k]>.4);applyBrush(world,{...base,feature:'path',amount:-1});assert.equal(world.pathPaint[k],0);
  applyBrush(world,{...base,feature:'build'});assert.ok(world.buildPaint[k]>.4);
+ applyBrush(world,{...base,feature:'blend',amount:.3});
  finishTerrain(world);const files=exportFiles(world,false),parsed=parseRecipe(JSON.parse(new TextDecoder().decode(files['recipe.json']))),restored=replayEdits(generateTerrain(parsed.settings),parsed.edits);
  for(const field of ['heights','moisture','biomeWeights','pathPaint','buildPaint','dressing','walkable','colors'] as const)assert.deepEqual(restored[field],world[field]);
  assert.deepEqual(restored.placements,world.placements);assert.ok(files['masks/dressing.png']);assert.ok(files['masks/painted-build.png']);
@@ -107,4 +108,25 @@ test('local biome painting leaves distant scenery candidates stable',()=>{
  const world=generateTerrain({resolution:129}),before=world.placements.filter(p=>Math.hypot(p.x,p.z)>30);
  applyBrush(world,{feature:'biome',x:0,z:0,radius:20,amount:1,biome:2,target:0,stroke:1});finishTerrain(world);
  assert.deepEqual(world.placements.filter(p=>Math.hypot(p.x,p.z)>30),before);
+});
+test('blend averages peaks symmetrically within its radius and right brush restores relief',()=>{
+ const world=generateTerrain({resolution:129,vegetation:0}),n=129,k=64*n+64;
+ world.heights.fill(0);world.protectedMask.fill(0);world.heights[k]=20;world.baseHeights.set(world.heights);
+ const e={feature:'blend' as const,x:0,z:0,radius:16,amount:.5,biome:0,target:0,stroke:1};
+ applyBrush(world,e);
+ assert.ok(world.heights[k]>0&&world.heights[k]<20);
+ assert.ok(world.heights[k+1]>0);assert.equal(world.heights[k-1],world.heights[k+1]);assert.equal(world.heights[k-n],world.heights[k+n]);
+ for(let z=0;z<n;z++)for(let x=0;x<n;x++){
+  const h=world.heights[z*n+x];assert.ok(h>=0&&h<=20);
+  if(Math.hypot((x-64)*2,(z-64)*2)>=16)assert.equal(h,0);
+ }
+ assert.ok(world.slopes[k]<Math.atan(20/2)*180/Math.PI);
+ applyBrush(world,{...e,amount:-.25});assert.equal(world.heights[k],20);
+});
+test('blend preserves access protection and stays finite at map corners',()=>{
+ const world=generateTerrain({resolution:129,vegetation:0}),before=world.heights.slice();
+ for(const [x,z] of [[0,0],[-128,-128],[128,128]])applyBrush(world,{feature:'blend',x,z,radius:128,amount:1,biome:0,target:0,stroke:1});
+ finishTerrain(world);
+ for(let k=0;k<before.length;k++){assert.ok(Number.isFinite(world.heights[k]));if(world.protectedMask[k])assert.equal(world.heights[k],before[k]);}
+ assertReachable(world);
 });

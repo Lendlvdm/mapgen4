@@ -6,11 +6,17 @@ export function applyBrush(t:Terrain,input:BrushStroke,record=true,refresh=true)
   const e=validateStroke(input,t.settings),n=t.settings.resolution,step=t.settings.worldSize/(n-1),half=t.settings.worldSize/2;
   const x0=clamp(Math.floor((e.x-e.radius+half)/step),0,n-1),x1=clamp(Math.ceil((e.x+e.radius+half)/step),0,n-1);
   const z0=clamp(Math.floor((e.z-e.radius+half)/step),0,n-1),z1=clamp(Math.ceil((e.z+e.radius+half)/step),0,n-1);
+  // Read all averages before modifying any heights, avoiding directional scan bias.
+  const average=e.feature==='blend'&&e.amount>0?brushAverages(t,e,{x0,x1,z0,z1}):undefined;
   for(let z=z0;z<=z1;z++)for(let x=x0;x<=x1;x++) {
     const k=z*n+x,d=Math.hypot(x*step-half-e.x,z*step-half-e.z)/e.radius;
     if(d>=1)continue;
     const falloff=1-smooth(.25,1,d),a=e.amount*falloff,free=t.protectedMask[k]===0;
     if(e.feature==='cliff'&&free)t.heights[k]+=a*Math.max(2,t.settings.worldSize/128);
+    if(e.feature==='blend'&&free){
+      const target=a>0?average!(x,z):t.baseHeights[k];
+      t.heights[k]+=(target-t.heights[k])*Math.min(1,Math.abs(a)*4);
+    }
     if((e.feature==='path'||e.feature==='build')&&free){
       const layer=e.feature==='path'?t.pathPaint:t.buildPaint;
       layer[k]=clamp(layer[k]+a);
@@ -31,6 +37,26 @@ export function applyBrush(t:Terrain,input:BrushStroke,record=true,refresh=true)
   if(record)t.edits.push(e);
   if(refresh)refreshTerrain(t,bounds);
   return bounds;
+}
+// Summed-area tables make a broad neighborhood average constant-time per sample.
+// Only samples inside the circular brush contribute; protected samples are read-only.
+function brushAverages(t:Terrain,e:BrushStroke,b:Bounds){
+  const n=t.settings.resolution,step=t.settings.worldSize/(n-1),half=t.settings.worldSize/2;
+  const width=b.x1-b.x0+1,height=b.z1-b.z0+1,stride=width+1;
+  const sums=new Float64Array(stride*(height+1)),counts=new Uint32Array(sums.length);
+  for(let z=0;z<height;z++)for(let x=0;x<width;x++){
+    const inside=Math.hypot((b.x0+x)*step-half-e.x,(b.z0+z)*step-half-e.z)<e.radius;
+    const i=(z+1)*stride+x+1;
+    sums[i]=(inside?t.heights[(b.z0+z)*n+b.x0+x]:0)+sums[i-1]+sums[i-stride]-sums[i-stride-1];
+    counts[i]=(inside?1:0)+counts[i-1]+counts[i-stride]-counts[i-stride-1];
+  }
+  const reach=Math.max(1,Math.round(e.radius*.25/step));
+  return (x:number,z:number)=>{
+    const left=Math.max(0,x-b.x0-reach),right=Math.min(width,x-b.x0+reach+1);
+    const top=Math.max(0,z-b.z0-reach),bottom=Math.min(height,z-b.z0+reach+1);
+    const area=(a:Float64Array|Uint32Array)=>a[bottom*stride+right]-a[top*stride+right]-a[bottom*stride+left]+a[top*stride+left];
+    const count=area(counts);return count?area(sums)/count:t.heights[z*n+x];
+  };
 }
 export function replayEdits(t:Terrain,edits:BrushStroke[]) {
   for(const e of edits)applyBrush(t,e,true,false);

@@ -20,11 +20,11 @@
 <h2>Terrain painter</h2>
 <label><input id="paint-enabled" type="checkbox"> Enable painting</label>
 <div id="paint-panel" hidden>
-<label for="brush-feature">Feature</label><select id="brush-feature"><option value="cliff">Cliffs / hills</option><option value="path">Path</option><option value="build">Build area</option><option value="biome">Biome</option><option value="dressing">Biome dressing</option><option value="moisture">Moisture</option></select>
+<label for="brush-feature">Feature</label><select id="brush-feature"><option value="cliff">Cliffs / hills</option><option value="blend">Blend / smooth slopes</option><option value="path">Path</option><option value="build">Build area</option><option value="biome">Biome</option><option value="dressing">Biome dressing</option><option value="moisture">Moisture</option></select>
 <label for="brush-biome">Biome type</label><select id="brush-biome"><option value="0">Hearthfall Basin</option><option value="1">Glasswood</option><option value="2">Sundered Scar</option><option value="3">Silent Choir</option></select>
 <label for="brush-radius">Brush radius (metres)</label><input id="brush-radius" type="number" min="1" max="2048" step="1" value="12">
 <label for="brush-strength">Brush strength <output id="brush-strength-value">0.50</output></label><input id="brush-strength" type="range" min="0.1" max="1" step="0.05" value="0.5">
-<p class="hint">Hold left mouse to increase; hold right mouse to decrease. Paths and build areas gently level toward the stroke’s starting height. Generated access routes and clearings stay protected. Disable painting to orbit or pan.</p>
+<p class="hint">Hold left mouse to increase; hold right mouse to decrease. Blend averages nearby heights: left smooths slopes, right restores generated relief. Paths and build areas gently level toward the stroke’s starting height. Generated access routes and clearings stay protected. Disable painting to orbit or pan.</p>
 <div class="row"><button id="undo-paint">Undo stroke</button><button id="clear-paint">Clear painting</button></div>
 <p id="paint-status" class="hint">No painted changes</p></div>
 <h2>The four regions</h2><div class="legend"><span><i class="dot" style="background:#9c8da9"></i>Hearthfall Basin · warm refuge</span><span><i class="dot" style="background:#477e83"></i>Glasswood · crystalline woodland</span><span><i class="dot" style="background:#a26754"></i>Sundered Scar · rust and vents</span><span><i class="dot" style="background:#c9c3ce"></i>Silent Choir · pale monoliths</span></div>

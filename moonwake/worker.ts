@@ -5,7 +5,7 @@ import type {Terrain} from './types.ts';
 let terrain:Terrain|undefined;
 self.onmessage=(event:MessageEvent)=>{
   try {
-    if(event.data.type==='generate') {terrain=replayEdits(generateTerrain(event.data.settings),event.data.edits||[]);self.postMessage({type:'terrain',terrain});}
+    if(event.data.type==='generate') {terrain=replayEdits(generateTerrain(event.data.settings,event.data.pathRig),event.data.edits||[]);self.postMessage({type:'terrain',terrain});}
     else if(event.data.type==='export') {
       if(event.data.terrain)terrain=event.data.terrain;
       if(!terrain) throw new Error('Generate terrain before exporting');

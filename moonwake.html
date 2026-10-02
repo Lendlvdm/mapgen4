@@ -17,6 +17,14 @@
 <label for="moisture">Moisture <output id="moisture-value">0.70</output></label><input id="moisture" type="range" min="0" max="1" step="0.01" value="0.7">
 <label for="vegetation">Biome dressing <output id="vegetation-value">0.70</output></label><input id="vegetation" type="range" min="0" max="1" step="0.01" value="0.7">
 <button id="generate" class="primary wide">Generate landscape</button><div class="row"><button id="save-recipe" class="wide">Save recipe</button><button id="load-recipe" class="wide">Load recipe</button></div><input id="recipe-file" type="file" accept=".json,application/json">
+<h2>Path rig</h2>
+<label><input id="rig-enabled" type="checkbox"> Edit path nodes</label>
+<div id="rig-panel" hidden>
+<label for="rig-radius">Neighbor influence (metres)</label><input id="rig-radius" type="number" min="1" max="4096" value="45">
+<button id="rig-link" class="wide">Link two nodes</button>
+<div class="row"><button id="undo-rig" class="wide">Undo path edit</button><button id="reset-rig" class="wide">Reset paths</button></div>
+<p class="hint">Drag a blue node to reshape a path. Linked neighbors follow with diminishing influence along the path. Gold nodes anchor the points of interest. Lines preview immediately; terrain updates on release. For a new connection, choose Link two nodes, then click its endpoints.</p>
+<p id="rig-status" class="hint">Enable to show the linked path network.</p></div>
 <h2>Terrain painter</h2>
 <label><input id="paint-enabled" type="checkbox"> Enable painting</label>
 <div id="paint-panel" hidden>

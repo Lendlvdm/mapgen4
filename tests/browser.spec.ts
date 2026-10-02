@@ -76,3 +76,26 @@ test('Blend visibly changes a protected generated starting path',async({page})=>
  expect(point).toBeTruthy();const screen=await page.evaluate(p=>(window as any).__moonwake.project(p.x,p.z),point);await page.mouse.move(screen.x,screen.y);await page.mouse.down();await page.waitForTimeout(800);await page.mouse.up();
  const height=await page.evaluate(p=>(window as any).__moonwake.sample(p.x,p.z).height,point);expect(Math.abs(height-point.height)).toBeGreaterThan(.001);expect(errors).toEqual([]);
 });
+
+test('path rig drags linked nodes with falloff, links paths, undoes and saves the edited network',async({page})=>{
+ test.setTimeout(180000);const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('http://127.0.0.1:5174');await expect(page.locator('body')).toHaveAttribute('data-ready','true',{timeout:90000});
+ await page.locator('#resolution').selectOption('129');await page.locator('#generate').click();await expect(page.locator('#sample')).toHaveText('2.00 m');await page.locator('#top').click();await page.waitForTimeout(300);
+ await page.locator('#rig-enabled').check();const original=await page.evaluate(()=>(window as any).__moonwake.rig().graph);
+ const node=original.nodes.find((n:any)=>!n.pinned&&Math.abs(n.x)<50&&Math.abs(n.z)<35&&original.nodes.every((other:any)=>other.id===n.id||Math.hypot(other.x-n.x,other.z-n.z)>2.2));expect(node).toBeTruthy();
+ const screen=await page.evaluate(id=>(window as any).__moonwake.rig().project(id),node.id);
+ await page.mouse.move(screen.x,screen.y);await page.mouse.down();await page.mouse.move(screen.x+16,screen.y-8,{steps:5});
+ const live=await page.evaluate(()=>(window as any).__moonwake.rig().graph);expect(live.nodes.find((n:any)=>n.id===node.id).x).not.toBe(node.x);
+ const weights=await page.evaluate(()=>(window as any).__moonwake.rig().weights);expect(weights[node.id]).toBe(1);expect(Object.values(weights).some(w=>(w as number)>0&&(w as number)<1)).toBe(true);
+ await page.mouse.up();await expect(page.locator('#rig-status')).toContainText('Paths applied',{timeout:60000});await expect(page.locator('#export')).toBeEnabled();
+ const moved=await page.evaluate(()=>(window as any).__moonwake.rig().graph);expect(moved).not.toEqual(original);
+ for(const n of original.nodes.filter((n:any)=>n.pinned))expect(moved.nodes.find((q:any)=>q.id===n.id)).toEqual(n);
+ await page.locator('#rig-link').click();const targets=[moved.paths.find((p:any)=>p.id==='garden_scar').nodes[5],moved.paths.find((p:any)=>p.id==='scar_return').nodes[5]];
+ for(const id of targets){const p=await page.evaluate(id=>(window as any).__moonwake.rig().project(id),id);await page.mouse.click(p.x,p.y);}
+ await expect.poll(async()=>page.evaluate(()=>(window as any).__moonwake.rig().graph.paths.length),{timeout:60000}).toBe(original.paths.length+1);await expect(page.locator('#export')).toBeEnabled();
+ await page.locator('#rig-link').click();await page.screenshot({path:'test-results/studio-path-rig.png',fullPage:true});
+ await page.locator('#undo-rig').click();await expect(page.locator('#export')).toBeEnabled({timeout:60000});expect(await page.evaluate(()=>(window as any).__moonwake.rig().graph)).toEqual(moved);
+ const pending=page.waitForEvent('download');await page.locator('#save-recipe').click();const download=await pending,recipe=JSON.parse(await readFile((await download.path())!,'utf8'));expect(recipe.pathRig).toEqual(moved);
+ await page.locator('#reset-rig').click();await expect(page.locator('#export')).toBeEnabled({timeout:60000});expect(await page.evaluate(()=>(window as any).__moonwake.rig().graph)).toEqual(original);
+ await page.locator('#recipe-file').setInputFiles({name:'rig.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(recipe))});await expect(page.locator('#export')).toBeEnabled({timeout:60000});expect(await page.evaluate(()=>(window as any).__moonwake.rig().graph)).toEqual(moved);expect(errors).toEqual([]);
+});

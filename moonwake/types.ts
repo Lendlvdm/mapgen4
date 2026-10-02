@@ -1,3 +1,4 @@
+import {validateRig} from './path-rig.ts';
 export type Vec2 = [number, number];
 export interface Settings {
   seed: number; worldSize: number; resolution: number; relief: number;
@@ -16,7 +17,10 @@ export interface Placement {id: string; kind: 'crystal_tree'|'crystal'|'rock'|'m
 export type BrushFeature = 'cliff'|'blend'|'path'|'build'|'biome'|'dressing'|'moisture';
 export interface BrushStroke {feature:BrushFeature;x:number;z:number;radius:number;amount:number;biome:number;target:number;stroke:number;blendPaths?:boolean;}
 export interface Bounds {x0:number;z0:number;x1:number;z1:number;}
+export interface PathNode {id:string;x:number;z:number;pinned:boolean;anchor?:string;}
+export interface PathRig {version:1;nodes:PathNode[];paths:{id:string;gate:string;width:number;nodes:string[]}[];}
 export interface Terrain {
+  pathRig:PathRig; rigEdited:boolean;
   edits: BrushStroke[]; baseHeights:Float32Array; protectedMask:Uint8Array; accessMask:Uint8Array;
   pathPaint:Float32Array; buildPaint:Float32Array; dressing:Float32Array;
   settings: Settings; heights: Float32Array; moisture: Float32Array;
@@ -37,12 +41,12 @@ export function settings(input: Partial<Settings> = {}): Settings {
   return p;
 }
 
-export function parseRecipe(input:any):{settings:Settings;edits:BrushStroke[]} {
+export function parseRecipe(input:any):{settings:Settings;edits:BrushStroke[];pathRig?:PathRig} {
   if(!input||![1,2].includes(input.schemaVersion))throw new Error('Unsupported recipe schema');
-  const {schemaVersion,edits=[],...values}=input;
+  const {schemaVersion,edits=[],pathRig,...values}=input;
   const p=settings({...values,generation:values.generation??(schemaVersion===1?1:2)});
   if(!Array.isArray(edits)||edits.length>100000)throw new Error('Recipe edit limit exceeded');
-  return {settings:p,edits:edits.map(e=>validateStroke(e,p))};
+  return {settings:p,edits:edits.map(e=>validateStroke(e,p)),...(pathRig?{pathRig:validateRig(pathRig,p)}:{})};
 }
 export function validateStroke(e:BrushStroke,p:Settings):BrushStroke {
   if(!e||!['cliff','blend','path','build','biome','dressing','moisture'].includes(e.feature))throw new Error('Invalid brush feature');
@@ -51,4 +55,4 @@ export function validateStroke(e:BrushStroke,p:Settings):BrushStroke {
   if(Math.abs(e.x)>p.worldSize/2||Math.abs(e.z)>p.worldSize/2||e.radius<=0||e.radius>p.worldSize/2||Math.abs(e.amount)>1||Math.abs(e.target)>p.worldSize*4||!Number.isInteger(e.biome)||e.biome<0||e.biome>3||!Number.isInteger(e.stroke)||e.stroke<0)throw new Error('Brush values outside supported range');
   return {...e};
 }
-export function recipe(t:Terrain){return {schemaVersion:2,...t.settings,edits:t.edits};}
+export function recipe(t:Terrain){return {schemaVersion:2,...t.settings,edits:t.edits,...(t.rigEdited?{pathRig:t.pathRig}:{})};}

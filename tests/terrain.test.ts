@@ -1,4 +1,6 @@
 import test from 'node:test';
+import {createRig,dragRig,linkRig,rigInfluence,scaleRig,validateRig} from '../moonwake/path-rig.ts';
+import type {PathRig} from '../moonwake/types.ts';
 import assert from 'node:assert/strict';
 import {unzlibSync} from 'fflate';
 import {generateTerrain,routeAt,heightAt} from '../moonwake/terrain.ts';
@@ -143,4 +145,26 @@ test('path-enabled blend reshapes baked roads while keeping POIs connected and e
  assert.deepEqual(JSON.parse(new TextDecoder().decode(files['placements.json'])).routes,world.routes);
  // Restoring original relief must also respect the currently connected approach.
  applyBrush(world,{feature:'blend',blendPaths:true,x:0,z:0,radius:128,amount:-.5,biome:0,target:0,stroke:2});finishTerrain(world);assertReachable(world);
+});
+
+test('path rig falloff follows connected graph distance, shares junctions, and pins anchors',()=>{
+ const rig:PathRig={version:1,nodes:[{id:'a',x:0,z:0,pinned:false},{id:'b',x:10,z:0,pinned:false},{id:'c',x:20,z:0,pinned:false},{id:'d',x:30,z:0,pinned:true},{id:'branch',x:10,z:10,pinned:false},{id:'separate',x:0,z:1,pinned:false}],paths:[{id:'main',gate:'open',width:6,nodes:['a','b','c','d']},{id:'branch',gate:'open',width:6,nodes:['b','branch']}]};
+ const weights=rigInfluence(rig,'a',40);assert.equal(weights.get('a'),1);assert.ok(weights.get('b')!>weights.get('c')!);assert.equal(weights.get('c'),weights.get('branch'));assert.ok(!weights.has('separate'));assert.ok(!weights.has('d'));
+ const moved=dragRig(rig,'a',0,8,40,256);assert.equal(moved.nodes[0].z,8);assert.ok(moved.nodes[1].z>moved.nodes[2].z);assert.equal(moved.nodes[3].z,0);assert.equal(moved.nodes[5].z,1);assert.equal(rig.nodes[0].z,0);
+ const linked=linkRig(rig,'a','separate',256);assert.equal(linked.paths.length,3);assert.ok(rigInfluence(linked,'a',40).has('separate'));assert.throws(()=>linkRig(rig,'a','b',256));assert.throws(()=>linkRig(rig,'a','a',256));
+ assert.equal(scaleRig(rig,16).nodes[2].x,320);assert.throws(()=>validateRig({...rig,nodes:[...rig.nodes,rig.nodes[0]]},settings()));
+});
+test('rigged paths reshape terrain, preserve POI access, and replay with painting in exported recipes',()=>{
+ const original=generateTerrain({resolution:129,vegetation:0}),rig=createRig(original.routes,original.landmarks);
+ const path=rig.paths.find(p=>p.id==='garden_scar')!,node=rig.nodes.find(n=>n.id===path.nodes[Math.floor(path.nodes.length/2)])!;
+ const moved=dragRig(rig,node.id,3,4,35,256),linked=linkRig(moved,path.nodes[5],rig.paths.find(p=>p.id==='scar_return')!.nodes[5],256);
+ const world=generateTerrain(original.settings,linked);assert.notDeepEqual(world.heights,original.heights);assertReachable(world);
+ assert.deepEqual(world.landmarks,original.landmarks);assert.equal(world.pathRig.paths.length,rig.paths.length+1);
+ applyBrush(world,{feature:'moisture',x:0,z:0,radius:20,amount:.3,biome:0,target:0,stroke:1});finishTerrain(world);
+ const files=exportFiles(world,false),parsed=parseRecipe(JSON.parse(new TextDecoder().decode(files['recipe.json']))),restored=replayEdits(generateTerrain(parsed.settings,parsed.pathRig),parsed.edits);
+ assert.deepEqual(restored.heights,world.heights);assert.deepEqual(restored.moisture,world.moisture);assert.deepEqual(restored.routes,world.routes);assert.deepEqual(JSON.parse(new TextDecoder().decode(files['path-rig.json'])),world.pathRig);
+ const large=generateTerrain({worldSize:4096,resolution:129,vegetation:0},scaleRig(linked,16));assertReachable(large);
+ const broken=structuredClone(linked),camp=broken.nodes.find(n=>n.anchor==='camp_0')!;
+ broken.paths=broken.paths.filter(p=>!p.nodes.includes(camp.id));
+ assert.throws(()=>generateTerrain(original.settings,broken),/connect every point of interest/);
 });

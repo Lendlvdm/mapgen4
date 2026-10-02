@@ -1,5 +1,13 @@
 # Validation / 2 October 2026
 
+## Path rig
+
+Build, type checking, all 24 terrain/export tests and all six browser tests passed.
+
+The path-rig tests cover shared junctions, decreasing graph-distance influence, fixed anchors, disconnected nodes, new connectors, scaled 4 km terrain, POI reachability, painting replay and exported graph data. The browser check performs an actual mouse drag, verifies live movement and falloff, adds a link, undoes it, resets paths and reloads the saved rig recipe.
+
+![Path node rig in the terrain studio](images/studio-path-rig.png)
+
 ## Blend on generated paths
 
 All 22 terrain/export tests and two targeted browser flows passed. New coverage verifies changes to generated road samples, continued access to every POI, fixed landmark elevations, updated exported route heights, exact recipe replay, and left-button painting directly over a protected starting path. Build and type checks passed.

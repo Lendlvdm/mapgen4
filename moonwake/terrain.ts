@@ -1,6 +1,7 @@
+import {createRig,rigRoutes} from './path-rig.ts';
 import {createNoise2D} from 'simplex-noise';
 import {generateMacro} from './upstream.ts';
-import {settings, type Settings, type Terrain, type Route, type Landmark, type Placement, type Bounds} from './types.ts';
+import {settings, type Settings, type Terrain, type Route, type Landmark, type Placement, type Bounds, type PathRig} from './types.ts';
 export const clamp=(x:number,a=0,b=1)=>Math.max(a,Math.min(b,x));
 export const smooth=(a:number,b:number,x:number)=>{const t=clamp((x-a)/(b-a));return t*t*(3-2*t);};
 export function random(seed:number) {let a=seed>>>0;return ()=>{a+=0x6D2B79F5;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};}
@@ -31,7 +32,7 @@ export function routeAt(routes:Route[],x:number,z:number) {
   }
   return {distance,height,width};
 }
-export function generateTerrain(input:Partial<Settings>={}):Terrain {
+export function generateTerrain(input:Partial<Settings>={},rigInput?:PathRig):Terrain {
   const start=performance.now(),p=settings(input),n=p.resolution,s=p.worldSize/256,step=p.worldSize/(n-1),total=n*n;
   const noise=createNoise2D(random(p.seed)),macro=generateMacro(p.seed,p.moisture);
   const heights=new Float32Array(total),moisture=new Float32Array(total),biomeWeights=new Uint8Array(total*4),biomeIds=new Uint8Array(total),routeMask=new Uint8Array(total);
@@ -59,8 +60,10 @@ export function generateTerrain(input:Partial<Settings>={}):Terrain {
       landmarks.push(camp);
     }
   }
+  let pathRig=createRig(routes,landmarks);
+  if(rigInput){const converted=rigRoutes(rigInput,p,landmarks,(x,z)=>gentleHeight(x/s,z/s)*s);pathRig=converted.rig;routes=converted.routes;}
   const protectedMask=new Uint8Array(total);
-  const roadField=p.generation===2?rasterRoutes(routes,p):null;
+  const roadField=(p.generation===2||rigInput)?rasterRoutes(routes,p):null;
   for(let j=0;j<n;j++) for(let i=0;i<n;i++) {
     const k=j*n+i,u=i/(n-1),v=j/(n-1),x=(u-.5)*256,z=(v-.5)*256;
     const nx=x/128,nz=z/128,macroH=sample(macro.height,macro.size,u,v),rain=sample(macro.rain,macro.size,u,v),flow=sample(macro.drainage,macro.size,u,v);
@@ -88,7 +91,7 @@ export function generateTerrain(input:Partial<Settings>={}):Terrain {
     const grading=p.walkability*(1-rim)*(p.generation===2?1-spine*.85:1);
     h=h*(1-grading)+gentle*grading;
     const road=roadField?{distance:roadField.distance[k],height:0,width:roadField.width[k]}:routeAt(routes,x*s,z*s),roadWeight=1-smooth(road.width*.55,road.width*.55+5*s,road.distance);
-    if(p.generation===2)road.height=gentleHeight(x,z)*s;
+    if(p.generation===2||rigInput)road.height=gentleHeight(x,z)*s;
     protectedMask[k]=road.distance<road.width*.55?255:0;
     h=h*s*(1-roadWeight)+road.height*roadWeight;
     routeMask[k]=road.distance<road.width*.5?255:0;
@@ -111,12 +114,12 @@ export function generateTerrain(input:Partial<Settings>={}):Terrain {
     biomeWeights.set(bytes,k*4);biomeIds[k]=weights.indexOf(Math.max(...weights));
     moisture[k]=clamp(rain*.6+glass*.35+p.moisture*.2-scar*.25);
   }
-  const terrain:Terrain={settings:p,heights,moisture,biomeWeights,biomeIds,routeMask,routes,landmarks,protectedMask,accessMask:new Uint8Array(total),
+  const terrain:Terrain={pathRig,rigEdited:!!rigInput,settings:p,heights,moisture,biomeWeights,biomeIds,routeMask,routes,landmarks,protectedMask,accessMask:new Uint8Array(total),
     edits:[],baseHeights:heights.slice(),pathPaint:new Float32Array(total),buildPaint:new Float32Array(total),dressing:new Float32Array(total).fill(p.vegetation),
     slopes:new Float32Array(total),normals:new Float32Array(total*3),colors:new Float32Array(total*3),walkable:new Uint8Array(total),buildable:new Uint8Array(total),placements:[],
     stats:{minHeight:0,maxHeight:0,walkablePercent:0,buildablePercent:0,triangles:2*(n-1)**2,graphRegions:macro.regions,generationMs:0}};
-  if(p.generation===2)for(const route of routes)for(const point of route.points)point[2]=heightAt(terrain,point[0],point[1]);
-  refreshTerrain(terrain);protectAccess(terrain,p.generation===2);terrain.placements=scatter(terrain);terrain.stats.generationMs=performance.now()-start;
+  if(p.generation===2||rigInput)for(const route of routes)for(const point of route.points)point[2]=heightAt(terrain,point[0],point[1]);
+  refreshTerrain(terrain);protectAccess(terrain,p.generation===2||!!rigInput);terrain.placements=scatter(terrain);terrain.stats.generationMs=performance.now()-start;
   return terrain;
 }
 export function refreshTerrain(t:Terrain,bounds:Bounds={x0:0,z0:0,x1:t.settings.resolution-1,z1:t.settings.resolution-1}) {

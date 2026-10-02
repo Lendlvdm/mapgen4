@@ -42,6 +42,16 @@ Raise **Walkable terrain** under Landscape character, then click **Generate land
 
 New worlds use generator version 2. Loading a version 1 recipe preserves its original layout and shaping rules. New recipes explicitly record the generator version.
 
+### Rig and link paths
+
+Enable **Path rig → Edit path nodes**. Drag a blue node across the ground. **Neighbor influence** sets the distance, in metres along the connected paths, over which adjoining nodes follow. The selected node moves fully; movement fades smoothly to zero at that distance. Shared junctions are single nodes, so their linked paths stay together. Gold POI anchors remain fixed and stop the influence from propagating through them.
+
+The network previews immediately as you drag. On release, the generator rebuilds the ground under the changed paths, replays existing paint strokes, and verifies POI access. The camera stays in place. If a proposed edit cannot preserve access, the previous terrain and rig are retained.
+
+Choose **Link two nodes**, then click a node on each path to add a connector with intermediate editable nodes. Choose **Finish linking** to return to dragging. **Undo path edit** restores the previous rig; **Reset paths** restores the seed's original network. Disable node editing to orbit/pan; scroll still zooms. Painting and node editing are separate interaction modes.
+
+The rig controls generated paths and added connectors. Painted path masks remain brush data. Saved recipes carry custom node positions and shared connections, while exports also include `path-rig.json`. Changing world size scales the rig; POI anchors follow the current generated sites. Painting is replayed against the rebuilt terrain, so newly protected route samples can affect how an earlier stroke applies.
+
 ### Paint the world
 
 Enable **Terrain painter → Enable painting**. Choose a feature, radius in metres and strength. The projected circle follows the ground. Hold the left mouse button to increase and the right mouse button to decrease. Disable painting to orbit/pan; scroll still zooms while painting.

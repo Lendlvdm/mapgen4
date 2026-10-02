@@ -31,6 +31,7 @@ Recipes and manifest settings include `walkability`, a shaping strength from 0 t
 | `terrain/lod0/*.glb` | Full-resolution meshes, normals and biome-derived vertex colors |
 | `terrain/lod1/*.glb`, `lod2/*.glb` | Optional coarser uniform-level meshes |
 | `placements.json` | Proxy placements, objective clearings and route polylines with gate names |
+| `path-rig.json` | Version 1 graph: world-space X/Z nodes, pinned POI anchors and ordered node IDs for each path; units are metres |
 | `recipe.json` | Seed, settings, generator version and ordered brush edits, recipe schema 2 |
 | `masks/dressing.png` | Local scenery density, grayscale 0–255 |
 | `masks/painted-build.png` | Painted building reservation strength, grayscale 0–255; final eligibility is in buildable.png |
@@ -59,3 +60,9 @@ The masks do not validate a building's entire footprint, worker connectivity, ho
 ## Boundaries and geometry limits
 
 The terrain is an open heightfield surface. It has no underside, vertical perimeter closure, caves, tunnels or true overhangs. Place distant scenery/fog outside the playable boundary or author a separate cliff-wall kit. Generic river/sea water is not exported: Mapgen4's drainage is used as a lunar channel influence.
+
+## Path rig
+
+A custom recipe optionally contains `pathRig` alongside `edits`. It has `version: 1`, `nodes` (`id`, `x`, `z`, `pinned`, optional landmark `anchor`) and `paths` (`id`, `gate`, `width`, ordered `nodes` IDs). Repeated node IDs across paths identify shared junctions. Graph coordinates are physical world metres; Y is derived from the regenerated terrain. Exported `placements.json` route polylines include those final elevations.
+
+The CLI and browser apply the custom rig before grading the terrain and replaying brush edits. Old recipes without a rig use their seed's original paths. Every bundle includes the current graph in `path-rig.json`; a recipe only embeds it after path authoring. NPC/game pathfinding still needs integration in Godot.

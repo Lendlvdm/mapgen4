@@ -24,6 +24,8 @@ The macro field contributes terrain variation, moisture and channel depth. The f
 | `types.ts` | Recipe contract, validation and biome names |
 | `upstream.ts` | Direct adapter to Mapgen4 algorithms |
 | `terrain.ts` | Moonwake shaping, masks, landmarks and placement |
+| `path-rig.ts` | Shared-node path graph, validation, geodesic falloff, linking and scaling |
+| `path-rig-view.ts` | Node handles, drag previews and link picking |
 | `editor.ts` | Local brush edits, validation and deterministic replay |
 | `export.ts` | Shared chunk extraction, GLB, PNG and ZIP encoders |
 | `worker.ts` | Browser generation/export operations and error reporting |
@@ -57,3 +59,9 @@ Recipe schema 2 saves generator version plus ordered strokes; undo regenerates a
 Finer streamed terrain tiles, closed cliff wall meshes, navigable collision-aware graph baking, tile streaming and mixed-LOD stitching should be separate reviewed changes. Preserve deterministic recipes and version the export schema when changing interpretation.
 
 New Blend strokes record `blendPaths: true`. Earlier strokes without this flag retain their original protected-path behavior when replayed. Finishing an edited world updates exported route-point elevations from the resulting terrain so path metadata remains aligned with the meshes.
+
+## Path authoring
+
+Generated route samples form an explicit shared-node graph. A shortest-path search from the selected node measures influence along graph edges. Smoothstep falloff weights a drag relative to its initial snapshot, avoiding accumulated drift; pinned anchors stop propagation. Added connectors reuse endpoint IDs and insert intermediate nodes. The pointer drag uses a horizontal plane through the selected node; rendered handles remain projected above the terrain.
+
+Node previews update immediately. Release submits a new rig to the generation worker. Terrain generation uses the new route field, rebuilds its protection/access masks, then replays painting. Successful changes enter the in-memory rig undo stack; failures restore the previous graph and leave the previous terrain/export snapshot intact. Recipes persist the current rig, not undo history. Normal world regeneration or recipe loading clears the rig undo history.

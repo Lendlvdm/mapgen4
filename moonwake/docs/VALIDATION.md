@@ -1,4 +1,22 @@
-# Validation / 1 October 2026
+# Validation / 2 October 2026
+
+## Generator 2 and terrain painter
+
+- Build and TypeScript checks passed.
+- 19 terrain/export tests passed, including legacy generator behavior, seeded curved routes, two camp factions, inland ridge slopes, 4,096 m extent, all brush layers, subtraction, exact recipe replay and exported float heights.
+- Four Chrome browser tests passed. The new flow exercises all six brush types with actual mouse holds, left/right painting, the projected circle, undo/clear, recipe save/reload, and 4 km rendering at 4 m spacing. The downloaded ZIP recipe and sampled float height match the painted preview.
+- All six POIs were reachable in a separate sweep of 40 seeds across 256 m, 1,024 m and 4,096 m worlds at coarse preview resolution and alternating relief/walkability extremes.
+- A destructive paint test raises terrain across the interior and confirms unchanged protected heights and continued reachability of every relay and camp.
+- 4 km CLI export: seed 187, 1025 samples, walkability 0.8, 2,097,152 LOD0 triangles, 256 full-detail tiles, 768 GLBs including lower detail levels. Generation measured about 2.1 seconds on this host, excluding export encoding.
+- Godot 4.7.2 loaded all 768 files and created static collision shapes for all 256 full-detail tiles. [4 km machine-readable result](godot-validation-4096.json).
+
+![Terrain brush and projected circle](images/studio-brush.png)
+
+![4,096 m generated landscape](images/studio-4096.png)
+
+These checks validate terrain data and importability. They do not run NPC AI or a player through the world. At 4 km the maximum current grid has 4 m spacing; production terrain may need finer streamed tiles.
+
+## Earlier generator 1 validation / 1 October 2026
 
 ## Results
 

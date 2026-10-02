@@ -2,9 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {unzlibSync} from 'fflate';
 import {generateTerrain,routeAt,heightAt} from '../moonwake/terrain.ts';
-import {settings} from '../moonwake/types.ts';
+import {applyBrush,replayEdits} from '../moonwake/editor.ts';
+import {finishTerrain} from '../moonwake/terrain.ts';
+import {settings,parseRecipe,type Terrain} from '../moonwake/types.ts';
 import {chunkMesh,glb,exportFiles} from '../moonwake/export.ts';
-const t=generateTerrain({resolution:257,vegetation:.4});
+const t=generateTerrain({resolution:257,vegetation:.4,generation:1});
 test('fixed seeds reproduce heights, blends and placement data',()=>{const b=generateTerrain(t.settings);assert.deepEqual(t.heights,b.heights);assert.deepEqual(t.biomeWeights,b.biomeWeights);assert.deepEqual(t.placements,b.placements);});
 test('seed changes terrain while retaining landmark coordinates',()=>{const b=generateTerrain({...t.settings,seed:188});assert.notDeepEqual(t.heights,b.heights);assert.deepEqual(t.landmarks,b.landmarks);});
 test('all samples finite, normals unit, four weights sum to 255',()=>{const present=new Set<number>();for(let k=0;k<t.heights.length;k++){assert.ok(Number.isFinite(t.heights[k]));assert.ok(t.slopes[k]>=0&&t.slopes[k]<=90);assert.ok(Math.abs(Math.hypot(...t.normals.subarray(k*3,k*3+3))-1)<1e-5);assert.equal(t.biomeWeights.subarray(k*4,k*4+4).reduce((a,b)=>a+b,0),255);present.add(t.biomeIds[k]);}assert.equal(present.size,4);});
@@ -27,7 +29,7 @@ test('exports preserve 16-bit heights, float heights and declared axis metadata'
  while(at<png.length){const size=v.getUint32(at),type=new TextDecoder().decode(png.subarray(at+4,at+8));if(type==='IDAT')idat=png.subarray(at+8,at+8+size);at+=size+12;}
  const decoded=unzlibSync(idat!);assert.equal(decoded.length,(257*2+1)*257);assert.equal(decoded[0],0);assert.equal(decoded[1]*256+decoded[2],raw.getUint16(0,true));
 });
-test('large scale uses physical metres and includes exact boundary samples',()=>{const big=generateTerrain({worldSize:1024,resolution:129,vegetation:0});assert.equal(big.settings.worldSize/(big.settings.resolution-1),8);assert.equal(big.landmarks[0].z,304);const c=chunkMesh(big,1,1);assert.equal(c.origin[0]+c.positions[c.positions.length-3],512);assert.ok(big.stats.maxHeight>t.stats.maxHeight*2);});
+test('large scale uses physical metres and includes exact boundary samples',()=>{const big=generateTerrain({generation:1,worldSize:1024,resolution:129,vegetation:0});assert.equal(big.settings.worldSize/(big.settings.resolution-1),8);assert.equal(big.landmarks[0].z,304);const c=chunkMesh(big,1,1);assert.equal(c.origin[0]+c.positions[c.positions.length-3],512);assert.ok(big.stats.maxHeight>t.stats.maxHeight*2);});
 test('invalid or excessive requests fail before allocation',()=>{for(const p of [{seed:NaN},{resolution:8193},{worldSize:100000},{terrace:2},{relief:-1},{seed:1.4},{walkability:-.01},{walkability:1.01},{walkability:NaN}])assert.throws(()=>settings(p));assert.throws(()=>chunkMesh(t,50,0));});
 test('walkable terrain grading increases real gentle ground and preserves regional constraints',()=>{
  const medium=generateTerrain({...t.settings,walkability:.5}),broad=generateTerrain({...t.settings,walkability:1}),n=t.settings.resolution;
@@ -40,16 +42,69 @@ test('walkable terrain grading increases real gentle ground and preserves region
  for(const l of broad.landmarks)assert.ok(Math.abs(heightAt(broad,l.x,l.z)-l.y)<.002);
  for(let k=0;k<broad.heights.length;k++)if(broad.walkable[k])assert.ok(broad.slopes[k]<=30);
  const files=exportFiles(broad,false),recipe=JSON.parse(new TextDecoder().decode(files['recipe.json']));
- assert.equal(recipe.walkability,1);delete recipe.schemaVersion;
+ assert.equal(recipe.walkability,1);delete recipe.schemaVersion;delete recipe.edits;
  assert.deepEqual(generateTerrain(recipe).heights,broad.heights);
  assert.equal(settings({seed:187}).walkability,0);
 });
 test('route connectivity survives representative seeds and extreme shaping controls',()=>{
  for(const options of [{seed:0,relief:.5,terrace:0,detail:1},{seed:991,relief:1.5,terrace:1,detail:1},{seed:2147483647,relief:1,terrace:.82,detail:.65},{seed:187,worldSize:1024,resolution:1025},{seed:0,walkability:.5},{seed:991,relief:1.5,terrace:1,walkability:1},{seed:187,worldSize:1024,resolution:1025,walkability:1}]){
-  const world=generateTerrain({resolution:257,vegetation:0,...options}),n=world.settings.resolution,size=world.settings.worldSize;
+  const world=generateTerrain({generation:1,resolution:257,vegetation:0,...options}),n=world.settings.resolution,size=world.settings.worldSize;
   const cell=(x:number,z:number)=>Math.round((z/size+.5)*(n-1))*n+Math.round((x/size+.5)*(n-1));
   const first=world.landmarks[0],queue=[cell(first.x,first.z)],seen=new Uint8Array(n*n);seen[queue[0]]=1;
   for(let h=0;h<queue.length;h++){const k=queue[h],x=k%n,z=Math.floor(k/n);for(const [dx,dz] of [[-1,0],[1,0],[0,-1],[0,1]]){const a=x+dx,b=z+dz,q=b*n+a;if(a>=0&&a<n&&b>=0&&b<n&&!seen[q]&&world.walkable[q]){seen[q]=1;queue.push(q);}}}
   for(const l of world.landmarks)assert.ok(seen[cell(l.x,l.z)],`seed ${options.seed}: ${l.id} connected`);
  }
+});
+
+function assertReachable(world:Terrain){
+ const n=world.settings.resolution,size=world.settings.worldSize,cell=(x:number,z:number)=>Math.round((z/size+.5)*(n-1))*n+Math.round((x/size+.5)*(n-1));
+ const first=world.landmarks[0],queue=[cell(first.x,first.z)],seen=new Uint8Array(n*n);seen[queue[0]]=1;
+ for(let h=0;h<queue.length;h++){const k=queue[h],x=k%n,z=Math.floor(k/n);for(const [dx,dz] of [[-1,0],[1,0],[0,-1],[0,1]]){const a=x+dx,b=z+dz,q=b*n+a;if(a>=0&&a<n&&b>=0&&b<n&&!seen[q]&&world.walkable[q]){seen[q]=1;queue.push(q);}}}
+ for(const l of world.landmarks)assert.ok(world.walkable[cell(l.x,l.z)]&&seen[cell(l.x,l.z)],`seed ${world.settings.seed}, ${size}m: ${l.id} reachable`);
+}
+test('new generator curves seeded paths, places two factions and preserves access at 4096 metres',()=>{
+ for(const options of [{seed:0,resolution:129,worldSize:4096},{seed:991,resolution:257,relief:1.5,terrace:1},{seed:187,resolution:1025,worldSize:4096,walkability:1}]) {
+  const world=generateTerrain({vegetation:0,...options});assertReachable(world);
+  const camps=world.landmarks.filter(l=>l.kind==='camp');assert.equal(camps.length,2);assert.deepEqual(camps.map(l=>l.faction),['neutral','enemy']);
+  for(const r of world.routes){assert.ok(r.points.length>4);for(const [x,z,y] of r.points)assert.ok(Math.abs(y-heightAt(world,x,z))<.001);}
+ }
+ const a=generateTerrain({resolution:129,vegetation:0}),b=generateTerrain({resolution:129,vegetation:0,seed:188}),same=generateTerrain(a.settings);
+ assert.notDeepEqual(a.routes,b.routes);assert.notDeepEqual(a.landmarks.slice(4),b.landmarks.slice(4));assert.deepEqual(a.routes,same.routes);assert.deepEqual(a.landmarks,same.landmarks);
+});
+test('mountain slopes remain inside the map even with maximum walkable strength',()=>{
+ const world=generateTerrain({resolution:257,vegetation:0,walkability:1}),n=world.settings.resolution;let cliffs=0;
+ for(let z=64;z<192;z++)for(let x=64;x<192;x++)if(world.slopes[z*n+x]>40)cliffs++;
+ assert.ok(cliffs>500,'interior ridge slopes remain');assertReachable(world);
+});
+test('painting changes real heights and data locally, supports subtraction and exact export replay',()=>{
+ const world=generateTerrain({resolution:129,vegetation:.4});const n=world.settings.resolution,step=world.settings.worldSize/(n-1);
+ let k=0;for(let i=20*n+20;i<world.heights.length-20*n;i++)if(!world.protectedMask[i]&&i%n>20&&i%n<108){k=i;break;}
+ const x=(k%n)*step-128,z=Math.floor(k/n)*step-128,base={x,z,radius:8,amount:.5,biome:2,target:world.heights[k],stroke:1};
+ const before=world.heights.slice(),initial=world.heights[k];applyBrush(world,{...base,feature:'cliff'});assert.ok(world.heights[k]>initial);assert.equal(world.heights[0],before[0]);
+ applyBrush(world,{...base,feature:'cliff',amount:-.25});assert.ok(world.heights[k]>initial&&world.heights[k]<initial+1.1);
+ const wet=world.moisture[k];applyBrush(world,{...base,feature:'moisture',amount:-1});assert.equal(world.moisture[k],0);applyBrush(world,{...base,feature:'moisture',amount:.5});assert.equal(world.moisture[k],.5);
+ applyBrush(world,{...base,feature:'biome',amount:1});assert.equal(world.biomeIds[k],2);assert.equal(world.biomeWeights[k*4+2],255);
+ applyBrush(world,{...base,feature:'biome',amount:-.5});assert.equal(world.biomeWeights.subarray(k*4,k*4+4).reduce((a,b)=>a+b,0),255);assert.ok(world.biomeWeights[k*4+2]<255);
+ applyBrush(world,{...base,feature:'dressing',amount:-1});assert.equal(world.dressing[k],0);applyBrush(world,{...base,feature:'dressing',amount:.5});assert.equal(world.dressing[k],.5);
+ applyBrush(world,{...base,feature:'path'});assert.ok(world.pathPaint[k]>.4);applyBrush(world,{...base,feature:'path',amount:-1});assert.equal(world.pathPaint[k],0);
+ applyBrush(world,{...base,feature:'build'});assert.ok(world.buildPaint[k]>.4);
+ finishTerrain(world);const files=exportFiles(world,false),parsed=parseRecipe(JSON.parse(new TextDecoder().decode(files['recipe.json']))),restored=replayEdits(generateTerrain(parsed.settings),parsed.edits);
+ for(const field of ['heights','moisture','biomeWeights','pathPaint','buildPaint','dressing','walkable','colors'] as const)assert.deepEqual(restored[field],world[field]);
+ assert.deepEqual(restored.placements,world.placements);assert.ok(files['masks/dressing.png']);assert.ok(files['masks/painted-build.png']);
+ const floats=new DataView(files['height/height.f32'].buffer);assert.equal(floats.getFloat32(k*4,true),world.heights[k]);
+});
+test('destructive brush strokes cannot sever generated POI and camp approaches',()=>{
+ const world=generateTerrain({resolution:257,vegetation:0});const protectedHeights=world.heights.slice();
+ for(let z=-96;z<=96;z+=24)for(let x=-96;x<=96;x+=24)applyBrush(world,{feature:'cliff',x,z,radius:24,amount:1,biome:0,target:0,stroke:1},true,false);
+ finishTerrain(world);for(let k=0;k<world.heights.length;k++)if(world.protectedMask[k])assert.equal(world.heights[k],protectedHeights[k]);assertReachable(world);
+});
+test('recipe migration and invalid brush inputs are handled explicitly',()=>{
+ assert.equal(parseRecipe({schemaVersion:1,seed:187}).settings.generation,1);
+ assert.equal(parseRecipe({schemaVersion:2,seed:187}).settings.generation,2);
+ for(const edit of [{feature:'bogus'},{feature:'cliff',x:NaN},{feature:'cliff',x:0,z:0,radius:-1,amount:.1,biome:0,target:0,stroke:1}])assert.throws(()=>parseRecipe({schemaVersion:2,edits:[edit]}));
+});
+test('local biome painting leaves distant scenery candidates stable',()=>{
+ const world=generateTerrain({resolution:129}),before=world.placements.filter(p=>Math.hypot(p.x,p.z)>30);
+ applyBrush(world,{feature:'biome',x:0,z:0,radius:20,amount:1,biome:2,target:0,stroke:1});finishTerrain(world);
+ assert.deepEqual(world.placements.filter(p=>Math.hypot(p.x,p.z)>30),before);
 });

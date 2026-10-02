@@ -1,0 +1,8 @@
+{
+  "collision_tiles": 256,
+  "engine": "4.7.2-stable (official)",
+  "failed": [],
+  "loaded_glbs": 768,
+  "resolution": 1025.0,
+  "world_size_m": 4096.0
+}

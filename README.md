@@ -2,7 +2,7 @@
 
 A separate terrain-authoring fork of [Red Blob Games Mapgen4](https://github.com/redblobgames/mapgen4). This repository is independent of the Moonwake Godot game. It generates actual terrain geometry and data for later game integration.
 
-![Actual generated Moonwake campaign terrain](moonwake/docs/images/studio-campaign.png)
+![Generated 4 km Moonwake landscape](moonwake/docs/images/studio-4096.png)
 
 ## Start
 
@@ -20,7 +20,9 @@ Open **http://127.0.0.1:5174**. Choose a seed, world size and sample count, then
 
 - Uses Mapgen4's real Poisson/Delaunay dual mesh, seeded elevation, wind-driven rainfall and river-flow algorithms as its macro field.
 - Applies a Moonwake layout with a sheltered southern colony, west Glasswood, eastern Scar and northern Choir.
-- Authors terraces, ravines, graded connecting routes and flat objective sites over that field.
+- Authors inland mountain ridges, terraces, ravines, seed-varied curved routes and protected objective clearings.
+- Randomizes two NPC camp sites (one neutral and one enemy), with clearings and connected approaches.
+- Paints cliffs, paths, build areas, biome blends, local dressing density and moisture directly onto the 3D terrain; edits are replayable and exportable.
 - Generates deterministic crystal woodland, rocks, monoliths, fungal caps and vent placement data.
 - Previews real 3D meshes with orbit controls, biome and walkability views, reference image and schematic colony/relay proxies.
 - Exports chunked GLB terrain, three uniform detail levels, a **16-bit grayscale height PNG**, float32/R16 heights, biome weight/ID masks, slopes, candidate walk/build masks and placement metadata.
@@ -30,23 +32,41 @@ Open **http://127.0.0.1:5174**. Choose a seed, world size and sample count, then
 |---|---:|---:|---:|
 | 256 m campaign | 513 × 513 | 0.5 m | 524,288 |
 | 1,024 m open world | 1025 × 1025 | 1 m | 2,097,152 |
+| 4,096 m frontier | 1025 × 1025 | 4 m | 2,097,152 |
 
 World dimensions and resolution are independent. A 1 km map at 129 samples is a coarse preview, not metre-resolution terrain. The studio displays spacing explicitly. Changes to controls require Generate; exports and Save recipe use the last generated world.
 
 ### Increase walkable terrain
 
-Raise **Walkable terrain** under Landscape character, then click **Generate landscape**. Higher strength blends inland terraces and ravines toward gentle ground while keeping the perimeter cliffs, biome boundaries, route grades and landmark clearings. Use **Walkability** to inspect the result and **Slope-pass area** to read the measured area. The slider is shaping strength, not a promised percentage or a change to the 30° slope limit.
+Raise **Walkable terrain** under Landscape character, then click **Generate landscape**. Higher strength expands gentle ground between mountain ridges. Seeded ridge crests remain in the interior as natural boundaries. Use **Walkability** to inspect the measured slope-pass area; the slider is shaping strength, not a requested area percentage or a change to the 30-degree slope limit.
 
-For seed 187 with the other default controls, maximum strength raises slope-pass area from **36.1% to 58.2%** in the 256 m / 513-sample valley, and **37.8% to 60.5%** in the 1,024 m / 1025-sample world. Results depend on the seed, relief, detail and sample spacing. These are terrain slope candidates; final gameplay navigation still needs prop collisions and player testing.
+New worlds use generator version 2. Loading a version 1 recipe preserves its original layout and shaping rules. New recipes explicitly record the generator version.
 
-The setting is saved in recipes and exports. Older recipes default to 0%, retaining their original terrain.
+### Paint the world
+
+Enable **Terrain painter → Enable painting**. Choose a feature, radius in metres and strength. The projected circle follows the ground. Hold the left mouse button to increase and the right mouse button to decrease. Disable painting to orbit/pan; scroll still zooms while painting.
+
+| Feature | Left hold | Right hold |
+|---|---|---|
+| Cliffs / hills | Raise local terrain with a soft shoulder | Lower local terrain |
+| Path | Add a path reservation and level toward the stroke's starting height | Remove painted reservation and blend toward generated terrain |
+| Build area | Add a building reservation and level toward the stroke's starting height | Remove painted reservation and blend toward generated terrain |
+| Biome | Increase the selected biome's blend weight | Redistribute that weight to other biomes |
+| Biome dressing | Increase local scenery density | Thin local scenery |
+| Moisture | Increase local wetness data | Decrease local wetness data |
+
+Changes appear during the stroke. Dressing refreshes at a throttled rate; final slopes, statistics and placements settle when released. **Undo stroke** removes the last complete drag; **Clear painting** restores the generated world. Painting automatically selects a useful inspection view for each data layer. A build reservation only becomes a build candidate when it meets the slope and exclusion rules.
+
+Generated routes, POI/camp clearings, and an actual connected walkable chain with its neighboring height samples are protected from height edits. This keeps terrain access open even when raising nearby cliffs. NPC allegiance is metadata and tent markers; NPC AI and game navigation remain future Godot work.
+
+**Save recipe** and **Export terrain bundle** include painting. Generating with a changed seed replays edits on the new world; changing world size scales edit positions, radii and target elevations proportionally. A brush covers at least two sample intervals so it remains usable on coarse previews. At 4,096 m, the 1025-sample limit means 4 m spacing; fine trails and building footprints still need finer tile generation in a later production pipeline.
 
 ## Command-line generation
 
 ```sh
 npm run generate -- --size 1024 --resolution 1025 --seed 187 --out exports/nacre-1024
 npm run generate -- --recipe exports/nacre-1024/recipe.json --out exports/reproduced
-npm run generate -- --size 1024 --resolution 1025 --walkability 1 --out exports/nacre-walkable
+npm run generate -- --size 4096 --resolution 1025 --walkability 1 --out exports/nacre-frontier
 ```
 
 Generated bundles are ignored by Git because high-resolution worlds can be large. See [the export contract](moonwake/docs/EXPORTS.md), [architecture](moonwake/docs/ARCHITECTURE.md) and [production scope](moonwake/docs/PRODUCTION.md).

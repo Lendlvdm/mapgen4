@@ -1,5 +1,6 @@
 import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
+import {unzipSync} from 'fflate';
 test('walkable terrain control expands ground and survives recipe saving and loading',async({page})=>{
  test.setTimeout(180000);const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto('http://127.0.0.1:5174');await expect(page.locator('body')).toHaveAttribute('data-ready','true',{timeout:90000});
@@ -39,4 +40,28 @@ test('one kilometre terrain renders at metre spacing and recipe reload regenerat
  await expect(page.locator('#extent')).toContainText('1,024',{timeout:90000});await expect(page.locator('#sample')).toHaveText('1.00 m');await expect(page.locator('#triangles')).toHaveText('2.10 M');await expect(page.locator('#export')).toBeEnabled();
  await page.screenshot({path:'test-results/studio-open-world.png',fullPage:true});
  await page.locator('#top').click();await page.locator('#biomes').click();await page.screenshot({path:'test-results/studio-biomes.png',fullPage:true});expect(errors).toEqual([]);
+});
+
+test('terrain painter edits live data, subtracts, undoes and exports a reproducible world',async({page})=>{
+ test.setTimeout(180000);const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('http://127.0.0.1:5174');await expect(page.locator('body')).toHaveAttribute('data-ready','true',{timeout:90000});
+ await page.locator('#resolution').selectOption('129');await page.locator('#generate').click();await expect(page.locator('#sample')).toHaveText('2.00 m');
+ await page.locator('#top').click();await page.waitForTimeout(300);await page.locator('#paint-enabled').check();
+ const point=await page.evaluate(()=>{const w=(window as any).__moonwake;for(let z=-60;z<=40;z+=20)for(let x=-60;x<=60;x+=20)if(!w.sample(x,z).protected)return {x,z};throw Error('No free brush sample');});
+ const sample=()=>page.evaluate(p=>(window as any).__moonwake.sample(p.x,p.z),point);
+ const paint=async(feature:string,button:'left'|'right'='left')=>{await page.locator('#brush-feature').selectOption(feature);const screen=await page.evaluate(p=>(window as any).__moonwake.project(p.x,p.z),point);await page.mouse.move(screen.x,screen.y);await page.mouse.down({button});await page.waitForTimeout(450);await page.mouse.up({button});};
+ const initial=await sample();await paint('cliff');const raised=await sample();expect(raised.height).toBeGreaterThan(initial.height);expect(await page.evaluate(()=>(window as any).__moonwake.edits)).toBeGreaterThan(0);
+ await paint('cliff','right');expect((await sample()).height).toBeLessThan(raised.height);
+ await paint('moisture','right');const dry=(await sample()).moisture;await paint('moisture');expect((await sample()).moisture).toBeGreaterThan(dry);
+ await page.locator('#brush-biome').selectOption(String((initial.biome+1)%4));const beforeBiome=await sample();await paint('biome');expect((await sample()).weights[(initial.biome+1)%4]).toBeGreaterThan(beforeBiome.weights[(initial.biome+1)%4]);
+ await paint('dressing','right');expect((await sample()).dressing).toBeLessThan(initial.dressing);expect(await page.evaluate(()=>(window as any).__moonwake.brushVisible)).toBe(true);await page.screenshot({path:'test-results/studio-brush.png',fullPage:true});
+ await paint('build');expect((await sample()).build).toBeGreaterThan(0);await paint('path');expect((await sample()).path).toBeGreaterThan(0);
+ await page.locator('#undo-paint').click();await expect(page.locator('#export')).toBeEnabled({timeout:60000});expect((await sample()).path).toBe(0);
+ const beforeSave=await sample(),pending=page.waitForEvent('download');await page.locator('#save-recipe').click();const download=await pending;const recipe=JSON.parse(await readFile((await download.path())!,'utf8'));expect(recipe.schemaVersion).toBe(2);expect(recipe.edits.length).toBeGreaterThan(0);
+ await page.locator('#clear-paint').click();await expect(page.locator('#export')).toBeEnabled({timeout:60000});expect((await sample()).height).toBe(initial.height);
+ await page.locator('#recipe-file').setInputFiles({name:'painted.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(recipe))});await expect(page.locator('#export')).toBeEnabled({timeout:60000});expect(await sample()).toEqual(beforeSave);
+ await page.locator('#paint-enabled').uncheck();await page.locator('#home').click();await page.locator('#beauty').click();await page.screenshot({path:'test-results/studio-painted.png',fullPage:true});
+ await page.locator('#lods').uncheck();const zipPending=page.waitForEvent('download');await page.locator('#export').click();const zip=await zipPending;await zip.saveAs('test-results/painted-export.zip');const files=unzipSync(new Uint8Array(await readFile('test-results/painted-export.zip')));expect(JSON.parse(new TextDecoder().decode(files['recipe.json']))).toEqual(recipe);const k=Math.round((point.z/256+.5)*128)*129+Math.round((point.x/256+.5)*128),raw=files['height/height.f32'];expect(new DataView(raw.buffer,raw.byteOffset,raw.byteLength).getFloat32(k*4,true)).toBe(beforeSave.height);
+ await page.locator('#preset').selectOption('4096');await page.locator('#resolution').selectOption('1025');await page.locator('#generate').click();await expect(page.locator('#extent')).toContainText('4,096',{timeout:90000});await expect(page.locator('#sample')).toHaveText('4.00 m');expect(await page.evaluate(()=>(window as any).__moonwake.camps.length)).toBe(2);
+ await page.screenshot({path:'test-results/studio-4096.png',fullPage:true});expect(errors).toEqual([]);
 });

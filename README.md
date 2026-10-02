@@ -56,11 +56,11 @@ Enable **Terrain painter → Enable painting**. Choose a feature, radius in metr
 | Biome dressing | Increase local scenery density | Thin local scenery |
 | Moisture | Increase local wetness data | Decrease local wetness data |
 
-Blend softens ridges and fills small depressions with a feathered edge. Brush radius controls the affected area and averaging scale; strength and hold duration control smoothing. Protected routes and clearings retain their heights. Use Undo stroke to recover the exact pre-stroke shape; right-click returns toward generated terrain.
+Blend softens ridges and fills small depressions with a feathered edge. Brush radius controls the affected area and averaging scale; strength and hold duration control smoothing. Blend includes generated starting paths and their shoulders. Height changes along connected approaches are slope-limited to keep POIs reachable; flat POI clearings retain their heights. Use Undo stroke to recover the exact pre-stroke shape; right-click returns toward generated terrain.
 
 Changes appear during the stroke. Dressing refreshes at a throttled rate; final slopes, statistics and placements settle when released. **Undo stroke** removes the last complete drag; **Clear painting** restores the generated world. Painting automatically selects a useful inspection view for each data layer. A build reservation only becomes a build candidate when it meets the slope and exclusion rules.
 
-Generated routes, POI/camp clearings, and an actual connected walkable chain with its neighboring height samples are protected from height edits. This keeps terrain access open even when raising nearby cliffs. NPC allegiance is metadata and tent markers; NPC AI and game navigation remain future Godot work.
+Cliff, path and build brushes preserve generated routes, POI/camp clearings, and the connected access chain. Blend may reshape the generated routes, with per-edge slope limits on the access chain and its neighbors. This keeps terrain access open while softening path transitions. NPC allegiance is metadata and tent markers; NPC AI and game navigation remain future Godot work.
 
 **Save recipe** and **Export terrain bundle** include painting. Generating with a changed seed replays edits on the new world; changing world size scales edit positions, radii and target elevations proportionally. A brush covers at least two sample intervals so it remains usable on coarse previews. At 4,096 m, the 1025-sample limit means 4 m spacing; fine trails and building footprints still need finer tile generation in a later production pipeline.
 

@@ -46,7 +46,7 @@ The high-resolution field adds detail to an approximately 6,500-region macro gra
 
 Generator 2 adds seeded noise ridge spines across the interior, jittered Catmull-Rom route curves, and two random camp clearings. Roads are rasterized within segment bounds so high-resolution generation avoids checking every segment against every world sample. Route widths account for sample spacing. Route heights use a shared gentle elevation field and landmark grading, reducing abrupt changes where paths join.
 
-A four-neighbor flood fill checks all six POIs against the actual slope mask. A connected chain and its eight-neighbor height samples are protected from sculpting, in addition to the route and clearing reservations. If a layout cannot connect a POI it returns an explicit generation error instead of exporting a silently disconnected world. This is terrain-grid access validation, not character collision or NPC navigation.
+A four-neighbor flood fill checks all six POIs against the actual slope mask. The connected chain is stored separately from the general protection mask. Cliff/path/build brushes preserve its incident height samples. New Blend stamps can modify roads and access-chain samples, but clamp each proposed height against the incident-edge slope limits wherever either endpoint belongs to that chain. Landmark clearings remain fixed. If a layout cannot connect a POI it returns an explicit generation error instead of exporting a silently disconnected world. This is terrain-grid access validation, not character collision or NPC navigation.
 
 `editor.ts` applies signed world-space brush stamps, with local falloff and bounds. Heights, biome weights, moisture, dressing density and path/build reservations are authoritative mutable data. Local normals and colors update during painting; statistics and placements finalize at stroke end. Scenery refreshes during dragging at a throttled rate. The viewer updates existing geometry buffers and keeps the camera in place. Export sends the edited snapshot to the worker, avoiding stale pre-paint output.
 
@@ -55,3 +55,5 @@ Recipe schema 2 saves generator version plus ordered strokes; undo regenerates a
 ## Future additions
 
 Finer streamed terrain tiles, closed cliff wall meshes, navigable collision-aware graph baking, tile streaming and mixed-LOD stitching should be separate reviewed changes. Preserve deterministic recipes and version the export schema when changing interpretation.
+
+New Blend strokes record `blendPaths: true`. Earlier strokes without this flag retain their original protected-path behavior when replayed. Finishing an edited world updates exported route-point elevations from the resulting terrain so path metadata remains aligned with the meshes.

@@ -66,3 +66,13 @@ test('terrain painter edits live data, subtracts, undoes and exports a reproduci
  await page.locator('#preset').selectOption('4096');await page.locator('#resolution').selectOption('1025');await page.locator('#generate').click();await expect(page.locator('#extent')).toContainText('4,096',{timeout:90000});await expect(page.locator('#sample')).toHaveText('4.00 m');expect(await page.evaluate(()=>(window as any).__moonwake.camps.length)).toBe(2);
  await page.screenshot({path:'test-results/studio-4096.png',fullPage:true});expect(errors).toEqual([]);
 });
+
+test('Blend visibly changes a protected generated starting path',async({page})=>{
+ test.setTimeout(90000);const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('http://127.0.0.1:5174');await expect(page.locator('body')).toHaveAttribute('data-ready','true',{timeout:60000});
+ await page.locator('#resolution').selectOption('129');await page.locator('#generate').click();await expect(page.locator('#sample')).toHaveText('2.00 m');
+ await page.locator('#top').click();await page.waitForTimeout(300);await page.locator('#paint-enabled').check();await page.locator('#brush-feature').selectOption('blend');await page.locator('#brush-radius').fill('20');
+ const point=await page.evaluate(()=>{const w=(window as any).__moonwake;let best:any,contrast=-1;for(let z=0;z<=40;z+=2)for(let x=-70;x<=60;x+=2){const s=w.sample(x,z);if(!s.generatedPath||!s.protected)continue;const c=Math.abs((w.sample(x-6,z).height+w.sample(x+6,z).height+w.sample(x,z-6).height+w.sample(x,z+6).height)/4-s.height);if(c>contrast){contrast=c;best={x,z,height:s.height};}}return best;});
+ expect(point).toBeTruthy();const screen=await page.evaluate(p=>(window as any).__moonwake.project(p.x,p.z),point);await page.mouse.move(screen.x,screen.y);await page.mouse.down();await page.waitForTimeout(800);await page.mouse.up();
+ const height=await page.evaluate(p=>(window as any).__moonwake.sample(p.x,p.z).height,point);expect(Math.abs(height-point.height)).toBeGreaterThan(.001);expect(errors).toEqual([]);
+});

@@ -14,10 +14,10 @@ export interface Route {id: string; gate: string; points: [number, number, numbe
 export interface Landmark {id: string; kind: string; name: string; x: number; z: number; y: number; radius: number; faction?: 'neutral'|'enemy';}
 export interface Placement {id: string; kind: 'crystal_tree'|'crystal'|'rock'|'monolith'|'vent'|'mooncap'; biome: number; x:number;y:number;z:number;scale:number;yaw:number;}
 export type BrushFeature = 'cliff'|'blend'|'path'|'build'|'biome'|'dressing'|'moisture';
-export interface BrushStroke {feature:BrushFeature;x:number;z:number;radius:number;amount:number;biome:number;target:number;stroke:number;}
+export interface BrushStroke {feature:BrushFeature;x:number;z:number;radius:number;amount:number;biome:number;target:number;stroke:number;blendPaths?:boolean;}
 export interface Bounds {x0:number;z0:number;x1:number;z1:number;}
 export interface Terrain {
-  edits: BrushStroke[]; baseHeights:Float32Array; protectedMask:Uint8Array;
+  edits: BrushStroke[]; baseHeights:Float32Array; protectedMask:Uint8Array; accessMask:Uint8Array;
   pathPaint:Float32Array; buildPaint:Float32Array; dressing:Float32Array;
   settings: Settings; heights: Float32Array; moisture: Float32Array;
   biomeWeights: Uint8Array; biomeIds: Uint8Array; slopes: Float32Array;
@@ -47,6 +47,7 @@ export function parseRecipe(input:any):{settings:Settings;edits:BrushStroke[]} {
 export function validateStroke(e:BrushStroke,p:Settings):BrushStroke {
   if(!e||!['cliff','blend','path','build','biome','dressing','moisture'].includes(e.feature))throw new Error('Invalid brush feature');
   for(const key of ['x','z','radius','amount','biome','target','stroke'] as const)if(!Number.isFinite(e[key]))throw new Error('Invalid brush data');
+  if(e.blendPaths!==undefined&&typeof e.blendPaths!=='boolean')throw new Error('Invalid blend path setting');
   if(Math.abs(e.x)>p.worldSize/2||Math.abs(e.z)>p.worldSize/2||e.radius<=0||e.radius>p.worldSize/2||Math.abs(e.amount)>1||Math.abs(e.target)>p.worldSize*4||!Number.isInteger(e.biome)||e.biome<0||e.biome>3||!Number.isInteger(e.stroke)||e.stroke<0)throw new Error('Brush values outside supported range');
   return {...e};
 }

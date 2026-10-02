@@ -1,5 +1,9 @@
 # Validation / 2 October 2026
 
+## Blend on generated paths
+
+All 22 terrain/export tests and two targeted browser flows passed. New coverage verifies changes to generated road samples, continued access to every POI, fixed landmark elevations, updated exported route heights, exact recipe replay, and left-button painting directly over a protected starting path. Build and type checks passed.
+
 ## Blend brush
 
 Build and type checks, all 21 terrain/export tests, and the targeted browser painter flow passed. New checks cover peak smoothing, symmetric averaging, unchanged samples outside the brush, protected approach heights, map corners, right-button relief restoration, and exact recipe/export replay. Browser checks use actual left/right holds with Blend selected and verify the edited recipe and height data in the downloaded ZIP.

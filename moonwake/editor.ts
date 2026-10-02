@@ -13,9 +13,12 @@ export function applyBrush(t:Terrain,input:BrushStroke,record=true,refresh=true)
     if(d>=1)continue;
     const falloff=1-smooth(.25,1,d),a=e.amount*falloff,free=t.protectedMask[k]===0;
     if(e.feature==='cliff'&&free)t.heights[k]+=a*Math.max(2,t.settings.worldSize/128);
-    if(e.feature==='blend'&&free){
+    const blendPath=e.feature==='blend'&&e.blendPaths;
+    const clearing=blendPath&&t.landmarks.some(l=>Math.hypot(x*step-half-l.x,z*step-half-l.z)<=l.radius+step);
+    if(e.feature==='blend'&&a!==0&&(free||blendPath)&&!clearing){
       const target=a>0?average!(x,z):t.baseHeights[k];
-      t.heights[k]+=(target-t.heights[k])*Math.min(1,Math.abs(a)*4);
+      const proposed=t.heights[k]+(target-t.heights[k])*Math.min(1,Math.abs(a)*4);
+      t.heights[k]=blendPath?constrainAccess(t,x,z,proposed,step):proposed;
     }
     if((e.feature==='path'||e.feature==='build')&&free){
       const layer=e.feature==='path'?t.pathPaint:t.buildPaint;
@@ -39,7 +42,7 @@ export function applyBrush(t:Terrain,input:BrushStroke,record=true,refresh=true)
   return bounds;
 }
 // Summed-area tables make a broad neighborhood average constant-time per sample.
-// Only samples inside the circular brush contribute; protected samples are read-only.
+// Only samples inside the circular brush contribute.
 function brushAverages(t:Terrain,e:BrushStroke,b:Bounds){
   const n=t.settings.resolution,step=t.settings.worldSize/(n-1),half=t.settings.worldSize/2;
   const width=b.x1-b.x0+1,height=b.z1-b.z0+1,stride=width+1;
@@ -57,6 +60,20 @@ function brushAverages(t:Terrain,e:BrushStroke,b:Bounds){
     const area=(a:Float64Array|Uint32Array)=>a[bottom*stride+right]-a[top*stride+right]-a[bottom*stride+left]+a[top*stride+left];
     const count=area(counts);return count?area(sums)/count:t.heights[z*n+x];
   };
+}
+// Every incident edge of the connected access chain must remain slope-passable.
+// Constrain both chain vertices and their neighbors; paths can move without losing access.
+function constrainAccess(t:Terrain,x:number,z:number,proposed:number,step:number){
+  const n=t.settings.resolution,k=z*n+x;
+  let low=-Infinity,high=Infinity;
+  for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++){
+    if(!dx&&!dz)continue;
+    const nx=x+dx,nz=z+dz,q=nz*n+nx;
+    if(nx<0||nx>=n||nz<0||nz>=n||(!t.accessMask[k]&&!t.accessMask[q]))continue;
+    const limit=Math.tan(29.99*Math.PI/180)*step*Math.hypot(dx,dz);
+    low=Math.max(low,t.heights[q]-limit);high=Math.min(high,t.heights[q]+limit);
+  }
+  return low<=high?clamp(proposed,low,high):t.heights[k];
 }
 export function replayEdits(t:Terrain,edits:BrushStroke[]) {
   for(const e of edits)applyBrush(t,e,true,false);

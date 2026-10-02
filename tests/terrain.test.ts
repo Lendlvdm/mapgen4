@@ -130,3 +130,17 @@ test('blend preserves access protection and stays finite at map corners',()=>{
  for(let k=0;k<before.length;k++){assert.ok(Number.isFinite(world.heights[k]));if(world.protectedMask[k])assert.equal(world.heights[k],before[k]);}
  assertReachable(world);
 });
+test('path-enabled blend reshapes baked roads while keeping POIs connected and exports aligned',()=>{
+ const world=generateTerrain({resolution:129,vegetation:0}),before=world.heights.slice();
+ for(let pass=0;pass<3;pass++)applyBrush(world,{feature:'blend',blendPaths:true,x:0,z:0,radius:128,amount:.5,biome:0,target:0,stroke:1});
+ finishTerrain(world);
+ const changed=world.heights.reduce((count,h,k)=>count+(world.routeMask[k]&&Math.abs(h-before[k])>.001?1:0),0);
+ assert.ok(changed>50,`expected generated paths to change, got ${changed} samples`);assertReachable(world);
+ for(const l of world.landmarks)assert.ok(Math.abs(heightAt(world,l.x,l.z)-l.y)<.002);
+ for(const r of world.routes)for(const [x,z,y] of r.points)assert.equal(y,heightAt(world,x,z));
+ const files=exportFiles(world,false),parsed=parseRecipe(JSON.parse(new TextDecoder().decode(files['recipe.json']))),restored=replayEdits(generateTerrain(parsed.settings),parsed.edits);
+ assert.deepEqual(restored.heights,world.heights);assert.deepEqual(restored.routes,world.routes);
+ assert.deepEqual(JSON.parse(new TextDecoder().decode(files['placements.json'])).routes,world.routes);
+ // Restoring original relief must also respect the currently connected approach.
+ applyBrush(world,{feature:'blend',blendPaths:true,x:0,z:0,radius:128,amount:-.5,biome:0,target:0,stroke:2});finishTerrain(world);assertReachable(world);
+});

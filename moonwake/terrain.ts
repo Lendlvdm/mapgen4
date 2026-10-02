@@ -111,12 +111,12 @@ export function generateTerrain(input:Partial<Settings>={}):Terrain {
     biomeWeights.set(bytes,k*4);biomeIds[k]=weights.indexOf(Math.max(...weights));
     moisture[k]=clamp(rain*.6+glass*.35+p.moisture*.2-scar*.25);
   }
-  const terrain:Terrain={settings:p,heights,moisture,biomeWeights,biomeIds,routeMask,routes,landmarks,protectedMask,
+  const terrain:Terrain={settings:p,heights,moisture,biomeWeights,biomeIds,routeMask,routes,landmarks,protectedMask,accessMask:new Uint8Array(total),
     edits:[],baseHeights:heights.slice(),pathPaint:new Float32Array(total),buildPaint:new Float32Array(total),dressing:new Float32Array(total).fill(p.vegetation),
     slopes:new Float32Array(total),normals:new Float32Array(total*3),colors:new Float32Array(total*3),walkable:new Uint8Array(total),buildable:new Uint8Array(total),placements:[],
     stats:{minHeight:0,maxHeight:0,walkablePercent:0,buildablePercent:0,triangles:2*(n-1)**2,graphRegions:macro.regions,generationMs:0}};
   if(p.generation===2)for(const route of routes)for(const point of route.points)point[2]=heightAt(terrain,point[0],point[1]);
-  refreshTerrain(terrain);if(p.generation===2)protectAccess(terrain);terrain.placements=scatter(terrain);terrain.stats.generationMs=performance.now()-start;
+  refreshTerrain(terrain);protectAccess(terrain,p.generation===2);terrain.placements=scatter(terrain);terrain.stats.generationMs=performance.now()-start;
   return terrain;
 }
 export function refreshTerrain(t:Terrain,bounds:Bounds={x0:0,z0:0,x1:t.settings.resolution-1,z1:t.settings.resolution-1}) {
@@ -149,7 +149,10 @@ export function refreshTerrain(t:Terrain,bounds:Bounds={x0:0,z0:0,x1:t.settings.
   }
   if(bounds.x0===0&&bounds.z0===0&&bounds.x1===n-1&&bounds.z1===n-1)Object.assign(t.stats,{minHeight,maxHeight,walkablePercent:100*walkCount/total,buildablePercent:100*buildCount/total});
 }
-export function finishTerrain(t:Terrain){refreshTerrain(t);t.placements=scatter(t);}
+export function finishTerrain(t:Terrain){
+  refreshTerrain(t);t.placements=scatter(t);
+  if(t.edits.some(e=>e.feature==='blend'&&e.blendPaths))for(const r of t.routes)for(const point of r.points)point[2]=heightAt(t,point[0],point[1]);
+}
 export function gentleHeight(x:number,z:number){return 8+(76-z)*.145+5*smooth(0,85,x)-4*Math.exp(-((x+84)**2+(z-8)**2)/2400);}
 function naturalRoutes(routes:Route[],p:Settings,landmarks:Landmark[]):Route[] {
   const s=p.worldSize/256,rng=random(p.seed+817),step=p.worldSize/(p.resolution-1);
@@ -209,7 +212,7 @@ function rasterRoutes(routes:Route[],p:Settings){
 
 // Protect an actually traversable grid chain plus its incident edges, including
 // shoulders where route/clearing blends meet. This survives arbitrarily tall edits.
-function protectAccess(t:Terrain){
+function protectAccess(t:Terrain,protect=true){
   const n=t.settings.resolution,size=t.settings.worldSize,cell=(l:Landmark)=>Math.round((l.z/size+.5)*(n-1))*n+Math.round((l.x/size+.5)*(n-1));
   const parent=new Int32Array(n*n).fill(-1),queue=new Int32Array(n*n),start=cell(t.landmarks[0]);let tail=1;queue[0]=start;parent[start]=start;
   for(let head=0;head<tail;head++){
@@ -217,7 +220,7 @@ function protectAccess(t:Terrain){
     for(const [dx,dz] of [[0,-1],[1,0],[-1,0],[0,1]]){const a=x+dx,b=z+dz,q=b*n+a;if(a>=0&&a<n&&b>=0&&b<n&&parent[q]===-1&&t.walkable[q]){parent[q]=k;queue[tail++]=q;}}
   }
   for(const l of t.landmarks){
-    let k=cell(l);if(parent[k]===-1)throw new Error(`No terrain approach to ${l.name}; try a different seed or finer height samples`);
-    while(true){const x=k%n,z=Math.floor(k/n);for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++){const a=x+dx,b=z+dz;if(a>=0&&a<n&&b>=0&&b<n)t.protectedMask[b*n+a]=255;}if(k===start)break;k=parent[k];}
+    let k=cell(l);if(parent[k]===-1){if(protect)throw new Error(`No terrain approach to ${l.name}; try a different seed or finer height samples`);continue;}
+    while(true){t.accessMask[k]=255;const x=k%n,z=Math.floor(k/n);if(protect)for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++){const a=x+dx,b=z+dz;if(a>=0&&a<n&&b>=0&&b<n)t.protectedMask[b*n+a]=255;}if(k===start)break;k=parent[k];}
   }
 }
